@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 import datetime
+import pyautogui
+import time
+import threading
 
 class SimpleGUI:
     def __init__(self, root):
@@ -78,9 +81,34 @@ class SimpleGUI:
     
     def button_clicked(self, function_name, command):
         """Handle button click events"""
-        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-        message = f"[{timestamp}] {function_name}: {command}"
-        self.add_log(message)
+        if function_name == "Click":
+            # Jalankan countdown dan get mouse position di thread terpisah
+            threading.Thread(target=self.handle_click_countdown, daemon=True).start()
+        else:
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            message = f"[{timestamp}] {function_name}: {command}"
+            self.add_log(message)
+    
+    def handle_click_countdown(self):
+        """Handle countdown and mouse position for Click button"""
+        try:
+            # Countdown 5 detik
+            for i in range(5, 0, -1):
+                timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+                self.add_log(f"[{timestamp}] Countdown: {i} detik...")
+                time.sleep(1)
+            
+            # Dapatkan posisi mouse saat ini
+            x, y = pyautogui.position()
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            function_name = "Click"
+            command = f"pyautogui.click({x}, {y})"
+            message = f"[{timestamp}] {function_name}: {command}"
+            self.add_log(message)
+            
+        except Exception as e:
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            self.add_log(f"[{timestamp}] Error: {str(e)}")
     
     def add_log(self, message):
         """Add message to log"""
