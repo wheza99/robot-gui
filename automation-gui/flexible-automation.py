@@ -75,6 +75,9 @@ class AutomationGUI:
         self.capture_btn = ttk.Button(self.coord_frame, text="Capture Mouse", command=self.capture_coordinates)
         self.capture_btn.grid(row=0, column=5, padx=(10, 0))
         
+        # Hide coordinate section initially
+        self.coord_frame.grid_remove()
+        
         # Parameters Section
         param_frame = ttk.Frame(add_frame)
         param_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
@@ -102,6 +105,13 @@ class AutomationGUI:
         self.drag_x = ttk.Entry(param_frame, width=8)
         self.drag_y_label = ttk.Label(param_frame, text="Y:")
         self.drag_y = ttk.Entry(param_frame, width=8)
+        self.drag_capture_btn = ttk.Button(param_frame, text="Capture Mouse", command=self.capture_drag_coordinates)
+        
+        # Store param_frame reference for later use
+        self.param_frame = param_frame
+        
+        # Hide parameter section initially
+        self.param_frame.grid_remove()
         
         # Delay parameter
         delay_frame = ttk.Frame(add_frame)
@@ -115,6 +125,12 @@ class AutomationGUI:
         # Add button
         self.add_btn = ttk.Button(delay_frame, text="Tambah Fungsi", command=self.add_function)
         self.add_btn.grid(row=0, column=2, padx=(20, 0))
+        
+        # Store delay_frame reference for later use
+        self.delay_frame = delay_frame
+        
+        # Hide delay section initially
+        self.delay_frame.grid_remove()
         
         # Functions List Section
         list_frame = ttk.LabelFrame(main_frame, text="Daftar Fungsi Automation", padding="10")
@@ -191,11 +207,19 @@ class AutomationGUI:
         self.hide_all_parameters()
         func_type = self.function_type.get()
         
+        # Show sections when function type is selected
+        if func_type:
+            # Show parameter section
+            self.param_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+            
+            # Show delay section
+            self.delay_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+        
         # Show/hide coordinate section based on function type
         if func_type in ["Type Text", "Hotkey", "Delay"]:
             # Hide coordinate section for functions that don't need coordinates
             self.coord_frame.grid_remove()
-        else:
+        elif func_type:
             # Show coordinate section for functions that need coordinates
             self.coord_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
         
@@ -216,6 +240,7 @@ class AutomationGUI:
             self.drag_x.grid(row=0, column=2, padx=(0, 10))
             self.drag_y_label.grid(row=0, column=3, sticky=tk.W, padx=(10, 5))
             self.drag_y.grid(row=0, column=4, padx=(0, 10))
+            self.drag_capture_btn.grid(row=0, column=5, padx=(10, 0))
     
     def hide_all_parameters(self):
         """Hide all parameter widgets"""
@@ -223,7 +248,7 @@ class AutomationGUI:
             self.text_label, self.text_entry,
             self.hotkey_label, self.hotkey_entry,
             self.scroll_label, self.scroll_direction, self.scroll_amount_label, self.scroll_amount,
-            self.drag_label, self.drag_x_label, self.drag_x, self.drag_y_label, self.drag_y
+            self.drag_label, self.drag_x_label, self.drag_x, self.drag_y_label, self.drag_y, self.drag_capture_btn
         ]
         for widget in widgets_to_hide:
             widget.grid_remove()
@@ -242,6 +267,23 @@ class AutomationGUI:
             self.coord_y.delete(0, tk.END)
             self.coord_y.insert(0, str(pos.y))
             self.status_label.config(text=f"Koordinat captured: ({pos.x}, {pos.y})")
+        
+        threading.Thread(target=capture, daemon=True).start()
+    
+    def capture_drag_coordinates(self):
+        """Capture mouse coordinates for drag destination after 3 seconds"""
+        def capture():
+            for i in range(3, 0, -1):
+                self.status_label.config(text=f"Capture koordinat drag dalam {i} detik...")
+                self.root.update()
+                time.sleep(1)
+            
+            pos = pyautogui.position()
+            self.drag_x.delete(0, tk.END)
+            self.drag_x.insert(0, str(pos.x))
+            self.drag_y.delete(0, tk.END)
+            self.drag_y.insert(0, str(pos.y))
+            self.status_label.config(text=f"Koordinat drag captured: ({pos.x}, {pos.y})")
         
         threading.Thread(target=capture, daemon=True).start()
     
@@ -301,6 +343,12 @@ class AutomationGUI:
             self.automation_functions.append(function)
             self.update_functions_list()
             self.clear_inputs()
+            
+            # Hide all sections after adding function
+            self.coord_frame.grid_remove()
+            self.param_frame.grid_remove()
+            self.delay_frame.grid_remove()
+            
             self.status_label.config(text=f"Fungsi {func_type} berhasil ditambahkan!")
             
         except ValueError:
@@ -388,14 +436,95 @@ class AutomationGUI:
         y_entry = ttk.Entry(coord_frame, textvariable=y_var, width=10)
         y_entry.grid(row=0, column=3, padx=5, pady=5)
         
+        # Capture Mouse button for coordinates
+        def capture_edit_coordinates():
+            """Capture mouse coordinates for edit dialog"""
+            def capture():
+                for i in range(3, 0, -1):
+                    status_label.config(text=f"Capture koordinat dalam {i} detik...")
+                    edit_window.update()
+                    time.sleep(1)
+                
+                pos = pyautogui.position()
+                x_var.set(str(pos.x))
+                y_var.set(str(pos.y))
+                status_label.config(text=f"Koordinat captured: ({pos.x}, {pos.y})")
+            
+            threading.Thread(target=capture, daemon=True).start()
+        
+        capture_coord_btn = ttk.Button(coord_frame, text="Capture Mouse", command=capture_edit_coordinates)
+        capture_coord_btn.grid(row=0, column=4, padx=(10, 5), pady=5)
+        
         # Parameter frame
         param_frame = ttk.LabelFrame(edit_window, text="Parameter")
         param_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=10, pady=5)
         
-        ttk.Label(param_frame, text="Parameter:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        param_var = tk.StringVar(value=str(func_data["parameter"]))
-        param_entry = ttk.Entry(param_frame, textvariable=param_var, width=40)
-        param_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+        # Create specific parameter fields for each function type
+        # Text parameter
+        text_label = ttk.Label(param_frame, text="Text:")
+        text_var = tk.StringVar()
+        text_entry = ttk.Entry(param_frame, textvariable=text_var, width=40)
+        
+        # Hotkey parameter
+        hotkey_label = ttk.Label(param_frame, text="Hotkey:")
+        hotkey_var = tk.StringVar()
+        hotkey_entry = ttk.Entry(param_frame, textvariable=hotkey_var, width=40)
+        
+        # Scroll parameters
+        scroll_label = ttk.Label(param_frame, text="Arah:")
+        scroll_var = tk.StringVar()
+        scroll_combo = ttk.Combobox(param_frame, textvariable=scroll_var, values=["up", "down"], state="readonly", width=10)
+        scroll_amount_label = ttk.Label(param_frame, text="Jumlah:")
+        scroll_amount_var = tk.StringVar()
+        scroll_amount_entry = ttk.Entry(param_frame, textvariable=scroll_amount_var, width=10)
+        
+        # Drag parameters
+        drag_label = ttk.Label(param_frame, text="Drag to X:")
+        drag_x_var = tk.StringVar()
+        drag_x_entry = ttk.Entry(param_frame, textvariable=drag_x_var, width=10)
+        drag_y_label = ttk.Label(param_frame, text="Y:")
+        drag_y_var = tk.StringVar()
+        drag_y_entry = ttk.Entry(param_frame, textvariable=drag_y_var, width=10)
+        
+        # Capture Mouse button for drag coordinates
+        def capture_edit_drag_coordinates():
+            """Capture mouse coordinates for drag destination in edit dialog"""
+            def capture():
+                for i in range(3, 0, -1):
+                    status_label.config(text=f"Capture koordinat drag dalam {i} detik...")
+                    edit_window.update()
+                    time.sleep(1)
+                
+                pos = pyautogui.position()
+                drag_x_var.set(str(pos.x))
+                drag_y_var.set(str(pos.y))
+                status_label.config(text=f"Koordinat drag captured: ({pos.x}, {pos.y})")
+            
+            threading.Thread(target=capture, daemon=True).start()
+        
+        drag_capture_btn = ttk.Button(param_frame, text="Capture Mouse", command=capture_edit_drag_coordinates)
+        
+        # Initialize parameter values based on current function type
+        current_param = func_data.get("parameter", "")
+        if func_data["type"] == "Type Text":
+            text_var.set(current_param)
+        elif func_data["type"] == "Hotkey":
+            hotkey_var.set(current_param)
+        elif func_data["type"] == "Scroll":
+            # Parse scroll parameter (e.g., "up 3")
+            parts = current_param.split()
+            if len(parts) >= 2:
+                scroll_var.set(parts[0])
+                scroll_amount_var.set(parts[1])
+            else:
+                scroll_amount_var.set("3")
+        elif func_data["type"] == "Drag":
+            # Parse drag parameter (e.g., "to (300, 400)")
+            import re
+            match = re.search(r'to \((\d+), (\d+)\)', current_param)
+            if match:
+                drag_x_var.set(match.group(1))
+                drag_y_var.set(match.group(2))
         
         # Delay
         ttk.Label(edit_window, text="Delay (detik):").grid(row=4, column=0, sticky=tk.W, padx=10, pady=5)
@@ -403,22 +532,53 @@ class AutomationGUI:
         delay_entry = ttk.Entry(edit_window, textvariable=delay_var, width=30)
         delay_entry.grid(row=4, column=1, sticky=(tk.W, tk.E), padx=10, pady=5)
         
+        # Status label for capture feedback
+        status_label = ttk.Label(edit_window, text="", foreground="blue")
+        status_label.grid(row=5, column=0, columnspan=2, pady=5)
+        
         # Function to update coordinate visibility
         def update_coord_visibility(*args):
             if type_var.get() in ["Type Text", "Hotkey", "Delay"]:
-                for widget in coord_frame.winfo_children():
-                    widget.configure(state="disabled")
+                coord_frame.grid_remove()  # Hide entire coordinate frame
             else:
-                for widget in coord_frame.winfo_children():
-                    if isinstance(widget, ttk.Entry):
-                        widget.configure(state="normal")
+                coord_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=10, pady=5)  # Show coordinate frame
+        
+        # Function to update parameter visibility based on function type
+        def update_param_visibility(*args):
+            # Hide all parameter widgets first
+            for widget in [text_label, text_entry, hotkey_label, hotkey_entry, 
+                          scroll_label, scroll_combo, scroll_amount_label, scroll_amount_entry,
+                          drag_label, drag_x_entry, drag_y_label, drag_y_entry, drag_capture_btn]:
+                widget.grid_remove()
+            
+            # Show relevant parameter widgets based on function type
+            func_type = type_var.get()
+            if func_type == "Type Text":
+                text_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+                text_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+            elif func_type == "Hotkey":
+                hotkey_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+                hotkey_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+            elif func_type == "Scroll":
+                scroll_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+                scroll_combo.grid(row=0, column=1, padx=5, pady=5)
+                scroll_amount_label.grid(row=0, column=2, sticky=tk.W, padx=(10, 5), pady=5)
+                scroll_amount_entry.grid(row=0, column=3, padx=5, pady=5)
+            elif func_type == "Drag":
+                drag_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+                drag_x_entry.grid(row=0, column=1, padx=5, pady=5)
+                drag_y_label.grid(row=0, column=2, sticky=tk.W, padx=(10, 5), pady=5)
+                drag_y_entry.grid(row=0, column=3, padx=5, pady=5)
+                drag_capture_btn.grid(row=0, column=4, padx=(10, 5), pady=5)
         
         type_var.trace("w", update_coord_visibility)
+        type_var.trace("w", update_param_visibility)
         update_coord_visibility()  # Initial call
+        update_param_visibility()  # Initial call
         
         # Buttons frame
         btn_frame = ttk.Frame(edit_window)
-        btn_frame.grid(row=5, column=0, columnspan=2, pady=20)
+        btn_frame.grid(row=6, column=0, columnspan=2, pady=20)
         
         def save_changes():
             """Save the edited function"""
@@ -446,13 +606,50 @@ class AutomationGUI:
                     messagebox.showerror("Error", "Delay harus berupa angka!")
                     return
                 
+                # Get parameters based on function type
+                parameter = ""
+                func_type = type_var.get()
+                
+                if func_type == "Type Text":
+                    parameter = text_var.get()
+                    if not parameter:
+                        messagebox.showerror("Error", "Masukkan text yang akan diketik!")
+                        return
+                elif func_type == "Hotkey":
+                    parameter = hotkey_var.get()
+                    if not parameter:
+                        messagebox.showerror("Error", "Masukkan hotkey (contoh: ctrl+c)!")
+                        return
+                elif func_type == "Scroll":
+                    direction = scroll_var.get()
+                    amount = scroll_amount_var.get()
+                    if not direction:
+                        messagebox.showerror("Error", "Pilih arah scroll!")
+                        return
+                    if not amount:
+                        amount = "3"
+                    parameter = f"{direction} {amount}"
+                elif func_type == "Drag":
+                    drag_x = drag_x_var.get()
+                    drag_y = drag_y_var.get()
+                    if not drag_x or not drag_y:
+                        messagebox.showerror("Error", "Masukkan koordinat drag tujuan!")
+                        return
+                    try:
+                        int(drag_x)
+                        int(drag_y)
+                    except ValueError:
+                        messagebox.showerror("Error", "Koordinat drag harus berupa angka!")
+                        return
+                    parameter = f"to ({drag_x}, {drag_y})"
+                
                 # Update function data
                 self.automation_functions[func_index] = {
                     "name": new_name,
                     "type": type_var.get(),
                     "x": new_x,
                     "y": new_y,
-                    "parameter": param_var.get(),
+                    "parameter": parameter,
                     "delay": new_delay
                 }
                 
@@ -536,6 +733,28 @@ class AutomationGUI:
         self.start_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
         
+        # Show countdown before starting
+        self.status_label.config(text="Automation akan dimulai dalam 3 detik...")
+        self.root.update()
+        time.sleep(1)
+        
+        if not self.is_running:  # Check if stopped during countdown
+            return
+            
+        self.status_label.config(text="Automation akan dimulai dalam 2 detik...")
+        self.root.update()
+        time.sleep(1)
+        
+        if not self.is_running:  # Check if stopped during countdown
+            return
+            
+        self.status_label.config(text="Automation akan dimulai dalam 1 detik...")
+        self.root.update()
+        time.sleep(1)
+        
+        if not self.is_running:  # Check if stopped during countdown
+            return
+        
         # Start automation in separate thread
         self.current_thread = threading.Thread(target=self.run_automation, daemon=True)
         self.current_thread.start()
@@ -558,7 +777,7 @@ class AutomationGUI:
                 if not self.is_running:
                     break
                 
-                self.status_label.config(text=f"Menjalankan: {func['type']} ({i+1}/{total_functions})")
+                self.status_label.config(text=f"Menjalankan: {func.get('name', 'Unnamed')} ({i+1}/{total_functions})")
                 self.root.update()
                 
                 # Execute function based on type
@@ -589,7 +808,7 @@ class AutomationGUI:
                 
                 elif func['type'] == "Scroll":
                     if func['x'] and func['y']:
-                        pyautogui.click(func['x'], func['y'])  # Click first to focus
+                        pyautogui.moveTo(func['x'], func['y'])  # Move mouse to position without clicking
                     parts = func['parameter'].split()
                     if len(parts) >= 2:
                         direction = parts[0]
@@ -604,8 +823,9 @@ class AutomationGUI:
                         coords = re.findall(r'\d+', func['parameter'])
                         if len(coords) >= 2:
                             target_x, target_y = int(coords[0]), int(coords[1])
-                            pyautogui.drag(target_x - func['x'], target_y - func['y'], 
-                                         duration=1, button='left')
+                            # Move to start position first, then drag to target position
+                            pyautogui.moveTo(func['x'], func['y'])
+                            pyautogui.dragTo(target_x, target_y, duration=1, button='left')
                 
                 # Apply delay after function execution
                 if func['delay'] > 0:
