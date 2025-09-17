@@ -139,10 +139,11 @@ class AutomationGUI:
         list_frame.rowconfigure(0, weight=1)
         
         # Treeview for functions list
-        columns = ("No", "Nama", "Fungsi", "Koordinat", "Parameter", "Delay")
+        columns = ("Enabled", "No", "Nama", "Fungsi", "Koordinat", "Parameter", "Delay")
         self.functions_tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=10)
         
         # Configure columns
+        self.functions_tree.heading("Enabled", text="Run")
         self.functions_tree.heading("No", text="No")
         self.functions_tree.heading("Nama", text="Nama Fungsi")
         self.functions_tree.heading("Fungsi", text="Jenis")
@@ -150,6 +151,7 @@ class AutomationGUI:
         self.functions_tree.heading("Parameter", text="Parameter")
         self.functions_tree.heading("Delay", text="Delay (s)")
         
+        self.functions_tree.column("Enabled", width=40, anchor=tk.CENTER)
         self.functions_tree.column("No", width=40, anchor=tk.CENTER)
         self.functions_tree.column("Nama", width=150, anchor=tk.W)
         self.functions_tree.column("Fungsi", width=80, anchor=tk.CENTER)
@@ -163,6 +165,9 @@ class AutomationGUI:
         
         self.functions_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        # Bind click event to toggle enabled status
+        self.functions_tree.bind("<Button-1>", self.on_treeview_click)
         
         # Function management buttons
         btn_frame = ttk.Frame(list_frame)
@@ -201,6 +206,22 @@ class AutomationGUI:
         
         # Initially hide parameter widgets
         self.hide_all_parameters()
+    
+    def on_treeview_click(self, event):
+        """Handle treeview click to toggle enabled status"""
+        region = self.functions_tree.identify_region(event.x, event.y)
+        if region == "cell":
+            column = self.functions_tree.identify_column(event.x)
+            if column == "#1":  # First column (Enabled)
+                item = self.functions_tree.identify_row(event.y)
+                if item:
+                    # Get the index of the clicked item
+                    item_index = self.functions_tree.index(item)
+                    if 0 <= item_index < len(self.automation_functions):
+                        # Toggle enabled status
+                        self.automation_functions[item_index]['enabled'] = not self.automation_functions[item_index].get('enabled', True)
+                        # Update the display
+                        self.update_functions_list()
     
     def on_function_type_change(self, event=None):
         """Handle function type selection change"""
@@ -337,7 +358,8 @@ class AutomationGUI:
                 "x": x,
                 "y": y,
                 "parameter": parameter,
-                "delay": delay
+                "delay": delay,
+                "enabled": True  # Default to enabled
             }
             
             self.automation_functions.append(function)
@@ -382,8 +404,12 @@ class AutomationGUI:
             coord_text = "N/A"
             if func['type'] not in ["Type Text", "Hotkey", "Delay"]:
                 coord_text = f"({func['x']}, {func['y']})" if func['x'] or func['y'] else "N/A"
+            
+            # Get enabled status with default True for backward compatibility
+            enabled_text = "✓" if func.get('enabled', True) else "X"
+            
             self.functions_tree.insert("", tk.END, values=(
-                i, func.get('name', 'Unnamed'), func['type'], coord_text, func['parameter'], func['delay']
+                enabled_text, i, func.get('name', 'Unnamed'), func['type'], coord_text, func['parameter'], func['delay']
             ))
     
     def edit_function(self):
@@ -576,6 +602,23 @@ class AutomationGUI:
         update_coord_visibility()  # Initial call
         update_param_visibility()  # Initial call
         
+        # Delay frame
+        delay_frame = ttk.LabelFrame(edit_window, text="Delay")
+        delay_frame.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=10, pady=5)
+        
+        ttk.Label(delay_frame, text="Delay setelah (detik):").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        delay_var = tk.StringVar(value=str(func_data["delay"]))
+        delay_entry = ttk.Entry(delay_frame, textvariable=delay_var, width=10)
+        delay_entry.grid(row=0, column=1, padx=5, pady=5)
+        
+        # Enabled checkbox frame
+        enabled_frame = ttk.LabelFrame(edit_window, text="Status")
+        enabled_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=10, pady=5)
+        
+        enabled_var = tk.BooleanVar(value=func_data.get('enabled', True))
+        enabled_checkbox = ttk.Checkbutton(enabled_frame, text="Aktifkan fungsi ini", variable=enabled_var)
+        enabled_checkbox.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        
         # Buttons frame
         btn_frame = ttk.Frame(edit_window)
         btn_frame.grid(row=6, column=0, columnspan=2, pady=20)
@@ -589,6 +632,16 @@ class AutomationGUI:
                     messagebox.showerror("Error", "Nama fungsi tidak boleh kosong!")
                     return
                 
+                # Get delay
+                new_delay = delay_var.get()
+                if not new_delay:
+                    new_delay = "1.0"
+                try:
+                    float(new_delay)
+                except ValueError:
+                    messagebox.showerror("Error", "Delay harus berupa angka!")
+                    return
+                
                 # Get coordinates if needed
                 new_x, new_y = None, None
                 if type_var.get() not in ["Type Text", "Hotkey", "Delay"]:
@@ -598,13 +651,6 @@ class AutomationGUI:
                     except ValueError:
                         messagebox.showerror("Error", "Koordinat harus berupa angka!")
                         return
-                
-                # Validate delay
-                try:
-                    new_delay = float(delay_var.get())
-                except ValueError:
-                    messagebox.showerror("Error", "Delay harus berupa angka!")
-                    return
                 
                 # Get parameters based on function type
                 parameter = ""
@@ -650,7 +696,8 @@ class AutomationGUI:
                     "x": new_x,
                     "y": new_y,
                     "parameter": parameter,
-                    "delay": new_delay
+                    "delay": new_delay,
+                    "enabled": enabled_var.get()
                 }
                 
                 self.update_functions_list()
@@ -770,10 +817,20 @@ class AutomationGUI:
     def run_automation(self):
         """Execute all automation functions in sequence"""
         try:
-            total_functions = len(self.automation_functions)
+            # Filter only enabled functions
+            enabled_functions = [func for func in self.automation_functions if func.get('enabled', True)]
+            total_functions = len(enabled_functions)
+            
+            if total_functions == 0:
+                self.status_label.config(text="Tidak ada fungsi yang diaktifkan!")
+                self.is_running = False
+                self.start_btn.config(state=tk.NORMAL)
+                self.stop_btn.config(state=tk.DISABLED)
+                return
+            
             self.progress['maximum'] = total_functions
             
-            for i, func in enumerate(self.automation_functions):
+            for i, func in enumerate(enabled_functions):
                 if not self.is_running:
                     break
                 
@@ -874,7 +931,14 @@ class AutomationGUI:
             )
             if filename:
                 with open(filename, 'r', encoding='utf-8') as f:
-                    self.automation_functions = json.load(f)
+                    loaded_functions = json.load(f)
+                
+                # Ensure backward compatibility by adding enabled field if missing
+                for func in loaded_functions:
+                    if 'enabled' not in func:
+                        func['enabled'] = True
+                
+                self.automation_functions = loaded_functions
                 self.update_functions_list()
                 messagebox.showinfo("Berhasil", f"Konfigurasi dimuat dari {filename}")
         except Exception as e:
