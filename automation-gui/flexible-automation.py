@@ -696,7 +696,7 @@ class AutomationGUI:
                     "x": new_x,
                     "y": new_y,
                     "parameter": parameter,
-                    "delay": new_delay,
+                    "delay": float(new_delay),  # Convert to float to ensure consistent data type
                     "enabled": enabled_var.get()
                 }
                 
@@ -933,10 +933,19 @@ class AutomationGUI:
                 with open(filename, 'r', encoding='utf-8') as f:
                     loaded_functions = json.load(f)
                 
-                # Ensure backward compatibility by adding enabled field if missing
+                # Ensure backward compatibility and data type consistency
                 for func in loaded_functions:
                     if 'enabled' not in func:
                         func['enabled'] = True
+                    
+                    # Convert delay to float to ensure consistent data type
+                    if 'delay' in func:
+                        try:
+                            func['delay'] = float(func['delay'])
+                        except (ValueError, TypeError):
+                            func['delay'] = 1.0  # Default delay if conversion fails
+                    else:
+                        func['delay'] = 1.0  # Default delay if missing
                 
                 self.automation_functions = loaded_functions
                 self.update_functions_list()
