@@ -303,15 +303,34 @@ class AutomationGUI:
         current_pos = pyautogui.position()
         popup_result["click_position"] = current_pos
         
+        # Store main window state
+        main_window_state = self.root.state()
+        
         # Create popup window
         popup = tk.Toplevel(self.root)
         popup.title("Input Text")
         popup.geometry("500x280")
         popup.resizable(False, False)
         
-        # Center the popup window
-        popup.transient(self.root)
+        # Make popup always on top and independent
+        popup.attributes('-topmost', True)
+        # Remove transient to make popup independent from main window
         popup.grab_set()
+        
+        # Center the popup on screen (not relative to main window)
+        popup.update_idletasks()
+        width = popup.winfo_width()
+        height = popup.winfo_height()
+        x = (popup.winfo_screenwidth() // 2) - (width // 2)
+        y = (popup.winfo_screenheight() // 2) - (height // 2)
+        popup.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Bring popup to front and focus
+        popup.lift()
+        popup.focus_force()
+        
+        # Now minimize main window after popup is created and positioned
+        self.root.iconify()
         
         # Main frame
         main_frame = ttk.Frame(popup, padding="20")
@@ -323,7 +342,7 @@ class AutomationGUI:
         title_label.pack(pady=(0, 15))
         
         # Info label
-        info_label = ttk.Label(main_frame, text="Setelah klik OK:\n1. GUI akan diminimize\n2. Tunggu 2 detik\n3. Kursor kembali ke posisi semula\n4. Tunggu 1 detik\n5. Mengetik text", 
+        info_label = ttk.Label(main_frame, text="Setelah klik OK, akan menunggu 2 detik, lalu kursor kembali ke posisi semula\ndan menunggu 1 detik lagi sebelum mengetik.", 
                               font=("Arial", 9), foreground="blue")
         info_label.pack(pady=(0, 10))
         
@@ -370,6 +389,15 @@ class AutomationGUI:
         
         # Wait for popup to close
         popup.wait_window()
+        
+        # Restore main window after popup closes
+        if main_window_state == 'normal':
+            self.root.deiconify()
+            self.root.lift()
+        elif main_window_state == 'zoomed':
+            self.root.deiconify()
+            self.root.state('zoomed')
+            self.root.lift()
         
         return popup_result
     
@@ -944,10 +972,7 @@ class AutomationGUI:
                     # Show popup to get text input
                     popup_result = self.show_text_input_popup()
                     if popup_result["confirmed"] and popup_result["text"]:
-                        # Minimize the main GUI window
-                        self.root.iconify()
-                        
-                        # Wait 2 seconds after OK is clicked
+                        # Wait 2 seconds after OK is clicked before moving cursor
                         time.sleep(2)
                         
                         # Check if we should click at the original position first
@@ -958,13 +983,8 @@ class AutomationGUI:
                         
                         # Wait 1 second before typing
                         time.sleep(1)
-                        
                         # Type the entered text
                         pyautogui.typewrite(popup_result["text"])
-                        
-                        # Restore the main GUI window
-                        self.root.deiconify()
-                        self.root.lift()
                     elif not popup_result["confirmed"]:
                         # If cancelled, skip this function
                         continue
