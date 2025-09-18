@@ -50,7 +50,7 @@ class AutomationGUI:
         # Function Type Selection
         ttk.Label(add_frame, text="Pilih Fungsi:").grid(row=0, column=2, sticky=tk.W, padx=(20, 10))
         self.function_type = ttk.Combobox(add_frame, values=[
-            "Click", "Type Text", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click"
+            "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click"
         ], state="readonly", width=15)
         self.function_type.grid(row=0, column=3, sticky=(tk.W, tk.E), padx=(0, 10))
         self.function_type.bind("<<ComboboxSelected>>", self.on_function_type_change)
@@ -237,7 +237,7 @@ class AutomationGUI:
             self.delay_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
         
         # Show/hide coordinate section based on function type
-        if func_type in ["Type Text", "Hotkey", "Delay"]:
+        if func_type in ["Type Text", "Type Text Popup", "Hotkey", "Delay"]:
             # Hide coordinate section for functions that don't need coordinates
             self.coord_frame.grid_remove()
         elif func_type:
@@ -247,6 +247,10 @@ class AutomationGUI:
         if func_type == "Type Text":
             self.text_label.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
             self.text_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+        elif func_type == "Type Text Popup":
+            # Type Text Popup doesn't need parameters in the main form
+            # The text will be entered through a popup during execution
+            pass
         elif func_type == "Hotkey":
             self.hotkey_label.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
             self.hotkey_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
@@ -291,6 +295,84 @@ class AutomationGUI:
         
         threading.Thread(target=capture, daemon=True).start()
     
+    def show_text_input_popup(self):
+        """Show popup window for text input and return the entered text"""
+        popup_result = {"text": "", "confirmed": False, "click_position": None}
+        
+        # Store current mouse position before showing popup
+        current_pos = pyautogui.position()
+        popup_result["click_position"] = current_pos
+        
+        # Create popup window
+        popup = tk.Toplevel(self.root)
+        popup.title("Input Text")
+        popup.geometry("500x280")
+        popup.resizable(False, False)
+        
+        # Center the popup window
+        popup.transient(self.root)
+        popup.grab_set()
+        
+        # Main frame
+        main_frame = ttk.Frame(popup, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title label
+        title_label = ttk.Label(main_frame, text="Masukkan text yang akan diketik:", 
+                               font=("Arial", 12, "bold"))
+        title_label.pack(pady=(0, 15))
+        
+        # Info label
+        info_label = ttk.Label(main_frame, text="Setelah klik OK:\n1. GUI akan diminimize\n2. Tunggu 2 detik\n3. Kursor kembali ke posisi semula\n4. Tunggu 1 detik\n5. Mengetik text", 
+                              font=("Arial", 9), foreground="blue")
+        info_label.pack(pady=(0, 10))
+        
+        # Text input field
+        text_var = tk.StringVar()
+        text_entry = ttk.Entry(main_frame, textvariable=text_var, font=("Arial", 11), width=50)
+        text_entry.pack(pady=(0, 15))
+        text_entry.focus()
+        
+        # Checkbox for click position option
+        click_option_var = tk.BooleanVar(value=True)
+        click_checkbox = ttk.Checkbutton(main_frame, 
+                                        text="Klik di posisi kursor sebelum mengetik", 
+                                        variable=click_option_var)
+        click_checkbox.pack(pady=(0, 15))
+        
+        # Button frame
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack()
+        
+        def on_ok():
+            popup_result["text"] = text_var.get()
+            popup_result["confirmed"] = True
+            popup_result["click_before_type"] = click_option_var.get()
+            popup.destroy()
+        
+        def on_cancel():
+            popup_result["confirmed"] = False
+            popup.destroy()
+        
+        # OK and Cancel buttons
+        ok_btn = ttk.Button(btn_frame, text="OK", command=on_ok)
+        ok_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        cancel_btn = ttk.Button(btn_frame, text="Cancel", command=on_cancel)
+        cancel_btn.pack(side=tk.LEFT)
+        
+        # Bind Enter key to OK button
+        def on_enter(event):
+            on_ok()
+        
+        text_entry.bind("<Return>", on_enter)
+        popup.bind("<Return>", on_enter)
+        
+        # Wait for popup to close
+        popup.wait_window()
+        
+        return popup_result
+    
     def capture_drag_coordinates(self):
         """Capture mouse coordinates for drag destination after 3 seconds"""
         def capture():
@@ -334,6 +416,10 @@ class AutomationGUI:
                 if not parameter:
                     messagebox.showwarning("Warning", "Masukkan text yang akan diketik!")
                     return
+            elif func_type == "Type Text Popup":
+                # For Type Text Popup, we don't need parameter validation here
+                # The text will be entered during execution via popup
+                parameter = "popup_text"  # Placeholder to indicate popup text input
             elif func_type == "Hotkey":
                 parameter = self.hotkey_entry.get()
                 if not parameter:
@@ -853,6 +939,35 @@ class AutomationGUI:
                 elif func['type'] == "Type Text":
                     if func['parameter']:
                         pyautogui.typewrite(func['parameter'])
+                
+                elif func['type'] == "Type Text Popup":
+                    # Show popup to get text input
+                    popup_result = self.show_text_input_popup()
+                    if popup_result["confirmed"] and popup_result["text"]:
+                        # Minimize the main GUI window
+                        self.root.iconify()
+                        
+                        # Wait 2 seconds after OK is clicked
+                        time.sleep(2)
+                        
+                        # Check if we should click at the original position first
+                        if popup_result.get("click_before_type", True) and popup_result.get("click_position"):
+                            # Move mouse back to original position and click
+                            original_pos = popup_result["click_position"]
+                            pyautogui.click(original_pos.x, original_pos.y)
+                        
+                        # Wait 1 second before typing
+                        time.sleep(1)
+                        
+                        # Type the entered text
+                        pyautogui.typewrite(popup_result["text"])
+                        
+                        # Restore the main GUI window
+                        self.root.deiconify()
+                        self.root.lift()
+                    elif not popup_result["confirmed"]:
+                        # If cancelled, skip this function
+                        continue
                 
                 elif func['type'] == "Hotkey":
                     if func['parameter']:
