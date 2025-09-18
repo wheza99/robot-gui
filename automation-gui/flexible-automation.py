@@ -1,9 +1,11 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import pyautogui
 import time
 import threading
 import json
+import requests
+import pyperclip
 
 class AutomationGUI:
     def __init__(self, root):
@@ -50,7 +52,7 @@ class AutomationGUI:
         # Function Type Selection
         ttk.Label(add_frame, text="Pilih Fungsi:").grid(row=0, column=2, sticky=tk.W, padx=(20, 10))
         self.function_type = ttk.Combobox(add_frame, values=[
-            "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click"
+            "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click", "HTTP Request"
         ], state="readonly", width=15)
         self.function_type.grid(row=0, column=3, sticky=(tk.W, tk.E), padx=(0, 10))
         self.function_type.bind("<<ComboboxSelected>>", self.on_function_type_change)
@@ -106,6 +108,29 @@ class AutomationGUI:
         self.drag_y_label = ttk.Label(param_frame, text="Y:")
         self.drag_y = ttk.Entry(param_frame, width=8)
         self.drag_capture_btn = ttk.Button(param_frame, text="Capture Mouse", command=self.capture_drag_coordinates)
+        
+        # HTTP Request parameters
+        self.http_url_label = ttk.Label(param_frame, text="URL:")
+        self.http_url_entry = ttk.Entry(param_frame, width=40)
+        
+        self.http_method_label = ttk.Label(param_frame, text="Method:")
+        self.http_method = ttk.Combobox(param_frame, values=["GET", "POST", "PUT", "DELETE", "PATCH"], state="readonly", width=10)
+        self.http_method.set("GET")
+        
+        self.http_headers_label = ttk.Label(param_frame, text="Headers (JSON):")
+        self.http_headers_entry = ttk.Entry(param_frame, width=40)
+        self.http_headers_entry.insert(0, '{"Content-Type": "application/json"}')
+        
+        self.http_body_label = ttk.Label(param_frame, text="Body (JSON):")
+        self.http_body_entry = ttk.Entry(param_frame, width=40)
+        
+        self.http_loop_label = ttk.Label(param_frame, text="Loop Count:")
+        self.http_loop_entry = ttk.Entry(param_frame, width=8)
+        self.http_loop_entry.insert(0, "1")
+        
+        self.http_loop_delay_label = ttk.Label(param_frame, text="Loop Delay (s):")
+        self.http_loop_delay_entry = ttk.Entry(param_frame, width=8)
+        self.http_loop_delay_entry.insert(0, "1.0")
         
         # Store param_frame reference for later use
         self.param_frame = param_frame
@@ -237,7 +262,7 @@ class AutomationGUI:
             self.delay_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
         
         # Show/hide coordinate section based on function type
-        if func_type in ["Type Text", "Type Text Popup", "Hotkey", "Delay"]:
+        if func_type in ["Type Text", "Type Text Popup", "Hotkey", "Delay", "HTTP Request"]:
             # Hide coordinate section for functions that don't need coordinates
             self.coord_frame.grid_remove()
         elif func_type:
@@ -266,6 +291,26 @@ class AutomationGUI:
             self.drag_y_label.grid(row=0, column=3, sticky=tk.W, padx=(10, 5))
             self.drag_y.grid(row=0, column=4, padx=(0, 10))
             self.drag_capture_btn.grid(row=0, column=5, padx=(10, 0))
+        elif func_type == "HTTP Request":
+            # Row 0: URL
+            self.http_url_label.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+            self.http_url_entry.grid(row=0, column=1, columnspan=3, sticky=(tk.W, tk.E), padx=(0, 10))
+            
+            # Row 1: Method and Headers
+            self.http_method_label.grid(row=1, column=0, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+            self.http_method.grid(row=1, column=1, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+            self.http_headers_label.grid(row=1, column=2, sticky=tk.W, padx=(10, 10), pady=(5, 0))
+            self.http_headers_entry.grid(row=1, column=3, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
+            
+            # Row 2: Body
+            self.http_body_label.grid(row=2, column=0, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+            self.http_body_entry.grid(row=2, column=1, columnspan=3, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
+            
+            # Row 3: Loop settings
+            self.http_loop_label.grid(row=3, column=0, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+            self.http_loop_entry.grid(row=3, column=1, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+            self.http_loop_delay_label.grid(row=3, column=2, sticky=tk.W, padx=(10, 10), pady=(5, 0))
+            self.http_loop_delay_entry.grid(row=3, column=3, sticky=tk.W, padx=(0, 10), pady=(5, 0))
     
     def hide_all_parameters(self):
         """Hide all parameter widgets"""
@@ -273,7 +318,10 @@ class AutomationGUI:
             self.text_label, self.text_entry,
             self.hotkey_label, self.hotkey_entry,
             self.scroll_label, self.scroll_direction, self.scroll_amount_label, self.scroll_amount,
-            self.drag_label, self.drag_x_label, self.drag_x, self.drag_y_label, self.drag_y, self.drag_capture_btn
+            self.drag_label, self.drag_x_label, self.drag_x, self.drag_y_label, self.drag_y, self.drag_capture_btn,
+            self.http_url_label, self.http_url_entry, self.http_method_label, self.http_method,
+            self.http_headers_label, self.http_headers_entry, self.http_body_label, self.http_body_entry,
+            self.http_loop_label, self.http_loop_entry, self.http_loop_delay_label, self.http_loop_delay_entry
         ]
         for widget in widgets_to_hide:
             widget.grid_remove()
@@ -295,7 +343,7 @@ class AutomationGUI:
         
         threading.Thread(target=capture, daemon=True).start()
     
-    def show_text_input_popup(self):
+    def show_text_input_popup(self, function_name=None):
         """Show popup window for text input and return the entered text"""
         popup_result = {"text": "", "confirmed": False, "click_position": None}
         
@@ -309,7 +357,7 @@ class AutomationGUI:
         # Create popup window
         popup = tk.Toplevel(self.root)
         popup.title("Input Text")
-        popup.geometry("500x280")
+        popup.geometry("520x230")  # Increased width and height for better layout
         popup.resizable(False, False)
         
         # Make popup always on top and independent
@@ -337,34 +385,41 @@ class AutomationGUI:
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Title label
-        title_label = ttk.Label(main_frame, text="Masukkan text yang akan diketik:", 
+        title_text = "Masukkan text yang akan diketik:"
+        if function_name:
+            title_text = f"Masukkan text untuk ({function_name}) yang akan diketik:"
+        
+        title_label = ttk.Label(main_frame, text=title_text, 
                                font=("Arial", 12, "bold"))
         title_label.pack(pady=(0, 15))
         
-        # Info label
-        info_label = ttk.Label(main_frame, text="Setelah klik OK, akan menunggu 2 detik, lalu kursor kembali ke posisi semula\ndan menunggu 1 detik lagi sebelum mengetik.", 
-                              font=("Arial", 9), foreground="blue")
-        info_label.pack(pady=(0, 10))
+        # Text input field (multiline) - fixed height to ensure buttons are visible
+        text_frame = ttk.Frame(main_frame)
+        text_frame.pack(pady=(0, 15), fill=tk.X)  # Changed from fill=BOTH, expand=True
         
-        # Text input field
-        text_var = tk.StringVar()
-        text_entry = ttk.Entry(main_frame, textvariable=text_var, font=("Arial", 11), width=50)
-        text_entry.pack(pady=(0, 15))
-        text_entry.focus()
+        text_widget = tk.Text(text_frame, font=("Arial", 11), width=50, height=4, wrap=tk.WORD)  # Reduced height from 6 to 4
+        text_widget.pack(side=tk.LEFT, fill=tk.X, expand=True)  # Changed from fill=BOTH
+        
+        # Scrollbar for text widget
+        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        text_widget.config(yscrollcommand=scrollbar.set)
+        
+        text_widget.focus()
         
         # Checkbox for click position option
         click_option_var = tk.BooleanVar(value=True)
         click_checkbox = ttk.Checkbutton(main_frame, 
                                         text="Klik di posisi kursor sebelum mengetik", 
                                         variable=click_option_var)
-        click_checkbox.pack(pady=(0, 15))
+        click_checkbox.pack(pady=(0, 4), anchor='w')
         
-        # Button frame
+        # Button frame - pack normally after checkbox
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack()
+        btn_frame.pack(pady=(0, 0))  # Pack normally with no padding
         
         def on_ok():
-            popup_result["text"] = text_var.get()
+            popup_result["text"] = text_widget.get("1.0", tk.END).rstrip('\n')  # Get all text and remove trailing newline
             popup_result["confirmed"] = True
             popup_result["click_before_type"] = click_option_var.get()
             popup.destroy()
@@ -373,19 +428,53 @@ class AutomationGUI:
             popup_result["confirmed"] = False
             popup.destroy()
         
-        # OK and Cancel buttons
-        ok_btn = ttk.Button(btn_frame, text="OK", command=on_ok)
-        ok_btn.pack(side=tk.LEFT, padx=(0, 10))
+        # OK and Cancel buttons with better styling - using tk.Button for larger appearance
+        ok_btn = tk.Button(btn_frame, text="OK", command=on_ok, 
+                          width=8, height=1, 
+                          font=("Arial", 9, "bold"),
+                          bg="#4CAF50", fg="white",
+                          relief="raised", bd=1)
+        ok_btn.pack(side=tk.LEFT, padx=(0, 5), pady=0)
         
-        cancel_btn = ttk.Button(btn_frame, text="Cancel", command=on_cancel)
-        cancel_btn.pack(side=tk.LEFT)
+        cancel_btn = tk.Button(btn_frame, text="Cancel", command=on_cancel, 
+                              width=8, height=1,
+                              font=("Arial", 9),
+                              bg="#f44336", fg="white",
+                              relief="raised", bd=1)
+        cancel_btn.pack(side=tk.LEFT, padx=(5, 0), pady=0)
         
-        # Bind Enter key to OK button
+        # Center the buttons within the frame
+        btn_frame.pack_configure(anchor='center')
+        
+        # Bind keyboard shortcuts for better UX
         def on_enter(event):
+            # Enter key confirms (OK)
+            on_ok()
+            return "break"  # Prevent default behavior
+        
+        def on_shift_enter(event):
+            # Shift+Enter creates new line
+            text_widget.insert(tk.INSERT, '\n')
+            return "break"  # Prevent default behavior
+        
+        def on_ctrl_enter(event):
+            # Ctrl+Enter creates new line (alternative)
+            text_widget.insert(tk.INSERT, '\n')
+            return "break"  # Prevent default behavior
+        
+        # Bind Enter key to OK button when it has focus
+        def on_button_enter(event):
             on_ok()
         
-        text_entry.bind("<Return>", on_enter)
+        # Bind keyboard events
+        text_widget.bind("<Return>", on_enter)
+        text_widget.bind("<Shift-Return>", on_shift_enter)
+        text_widget.bind("<Control-Return>", on_ctrl_enter)
         popup.bind("<Return>", on_enter)
+        ok_btn.bind("<Return>", on_button_enter)
+        
+        # Make OK button accessible via Tab navigation
+        ok_btn.focus_set()
         
         # Wait for popup to close
         popup.wait_window()
@@ -400,6 +489,52 @@ class AutomationGUI:
             self.root.lift()
         
         return popup_result
+    
+    def safe_typewrite(self, text):
+        """Enhanced typing method that handles special characters and emoticons better"""
+        if not text:
+            return
+            
+        try:
+            # Try normal typewrite first
+            pyautogui.typewrite(text)
+        except Exception as e:
+            # If normal typewrite fails, try character by character
+            print(f"Normal typewrite failed: {e}. Trying character by character...")
+            for char in text:
+                try:
+                    if char == '\n':
+                        # Handle newline with Enter key
+                        pyautogui.press('enter')
+                    elif char == '\t':
+                        # Handle tab with Tab key
+                        pyautogui.press('tab')
+                    else:
+                        # Try to type the character
+                        pyautogui.typewrite(char)
+                except Exception as char_error:
+                    # If character can't be typed, try using clipboard
+                    try:
+                        import pyperclip
+                        pyperclip.copy(char)
+                        pyautogui.hotkey('ctrl', 'v')
+                    except Exception as clipboard_error:
+                        print(f"Could not type character '{char}': {char_error}, clipboard error: {clipboard_error}")
+                        # Skip this character if all methods fail
+                        continue
+    
+    def process_text_for_typing(self, text):
+        """Process text to handle escape sequences and special characters"""
+        if not text:
+            return text
+            
+        # Handle common escape sequences
+        processed_text = text.replace('\\n', '\n')  # New line
+        processed_text = processed_text.replace('\\t', '\t')  # Tab
+        processed_text = processed_text.replace('\\r', '\r')  # Carriage return
+        processed_text = processed_text.replace('\\\\', '\\')  # Literal backslash
+        
+        return processed_text
     
     def capture_drag_coordinates(self):
         """Capture mouse coordinates for drag destination after 3 seconds"""
@@ -464,6 +599,62 @@ class AutomationGUI:
                 drag_x = int(self.drag_x.get()) if self.drag_x.get() else 0
                 drag_y = int(self.drag_y.get()) if self.drag_y.get() else 0
                 parameter = f"to ({drag_x}, {drag_y})"
+            elif func_type == "HTTP Request":
+                url = self.http_url_entry.get().strip()
+                method = self.http_method.get()
+                headers = self.http_headers_entry.get().strip()
+                body = self.http_body_entry.get().strip()
+                loop_count = self.http_loop_entry.get().strip()
+                loop_delay = self.http_loop_delay_entry.get().strip()
+                
+                if not url:
+                    messagebox.showwarning("Warning", "Masukkan URL!")
+                    return
+                
+                # Validate JSON format for headers
+                try:
+                    if headers:
+                        json.loads(headers)
+                except json.JSONDecodeError:
+                    messagebox.showwarning("Warning", "Format headers harus JSON yang valid!")
+                    return
+                
+                # Validate JSON format for body if not empty
+                try:
+                    if body:
+                        json.loads(body)
+                except json.JSONDecodeError:
+                    messagebox.showwarning("Warning", "Format body harus JSON yang valid!")
+                    return
+                
+                # Validate loop count
+                try:
+                    loop_count_int = int(loop_count) if loop_count else 1
+                    if loop_count_int < 1:
+                        messagebox.showwarning("Warning", "Loop count harus minimal 1!")
+                        return
+                except ValueError:
+                    messagebox.showwarning("Warning", "Loop count harus berupa angka!")
+                    return
+                
+                # Validate loop delay
+                try:
+                    loop_delay_float = float(loop_delay) if loop_delay else 1.0
+                    if loop_delay_float < 0:
+                        messagebox.showwarning("Warning", "Loop delay tidak boleh negatif!")
+                        return
+                except ValueError:
+                    messagebox.showwarning("Warning", "Loop delay harus berupa angka!")
+                    return
+                
+                parameter = json.dumps({
+                    "url": url,
+                    "method": method,
+                    "headers": headers,
+                    "body": body,
+                    "loop_count": loop_count_int,
+                    "loop_delay": loop_delay_float
+                })
             
             # Create function object
             function = {
@@ -505,6 +696,18 @@ class AutomationGUI:
         self.drag_y.delete(0, tk.END)
         self.delay_entry.delete(0, tk.END)
         self.delay_entry.insert(0, "1.0")
+        
+        # Clear HTTP request fields
+        self.http_url_entry.delete(0, tk.END)
+        self.http_method.set("GET")
+        self.http_headers_entry.delete(0, tk.END)
+        self.http_headers_entry.insert(0, '{"Content-Type": "application/json"}')
+        self.http_body_entry.delete(0, tk.END)
+        self.http_loop_entry.delete(0, tk.END)
+        self.http_loop_entry.insert(0, "1")
+        self.http_loop_delay_entry.delete(0, tk.END)
+        self.http_loop_delay_entry.insert(0, "1.0")
+        
         self.hide_all_parameters()
     
     def update_functions_list(self):
@@ -558,7 +761,7 @@ class AutomationGUI:
         ttk.Label(edit_window, text="Jenis Fungsi:").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
         type_var = tk.StringVar(value=func_data["type"])
         type_combo = ttk.Combobox(edit_window, textvariable=type_var, values=[
-            "Click", "Type Text", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click"
+            "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click", "HTTP Request"
         ], state="readonly", width=27)
         type_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=10, pady=5)
         
@@ -626,6 +829,31 @@ class AutomationGUI:
         drag_y_var = tk.StringVar()
         drag_y_entry = ttk.Entry(param_frame, textvariable=drag_y_var, width=10)
         
+        # HTTP Request parameters
+        http_url_label = ttk.Label(param_frame, text="URL:")
+        http_url_var = tk.StringVar()
+        http_url_entry = ttk.Entry(param_frame, textvariable=http_url_var, width=40)
+        
+        http_method_label = ttk.Label(param_frame, text="Method:")
+        http_method_var = tk.StringVar()
+        http_method_combo = ttk.Combobox(param_frame, textvariable=http_method_var, values=["GET", "POST", "PUT", "DELETE", "PATCH"], state="readonly", width=10)
+        
+        http_headers_label = ttk.Label(param_frame, text="Headers (JSON):")
+        http_headers_var = tk.StringVar()
+        http_headers_entry = ttk.Entry(param_frame, textvariable=http_headers_var, width=40)
+        
+        http_body_label = ttk.Label(param_frame, text="Body (JSON):")
+        http_body_var = tk.StringVar()
+        http_body_entry = ttk.Entry(param_frame, textvariable=http_body_var, width=40)
+        
+        http_loop_label = ttk.Label(param_frame, text="Loop Count:")
+        http_loop_var = tk.StringVar()
+        http_loop_entry = ttk.Entry(param_frame, textvariable=http_loop_var, width=10)
+        
+        http_loop_delay_label = ttk.Label(param_frame, text="Loop Delay (s):")
+        http_loop_delay_var = tk.StringVar()
+        http_loop_delay_entry = ttk.Entry(param_frame, textvariable=http_loop_delay_var, width=10)
+        
         # Capture Mouse button for drag coordinates
         def capture_edit_drag_coordinates():
             """Capture mouse coordinates for drag destination in edit dialog"""
@@ -665,6 +893,25 @@ class AutomationGUI:
             if match:
                 drag_x_var.set(match.group(1))
                 drag_y_var.set(match.group(2))
+        elif func_data["type"] == "HTTP Request":
+            # Parse HTTP Request parameter (JSON format)
+            try:
+                import json
+                http_params = json.loads(current_param)
+                http_url_var.set(http_params.get("url", ""))
+                http_method_var.set(http_params.get("method", "GET"))
+                http_headers_var.set(json.dumps(http_params.get("headers", {})))
+                http_body_var.set(json.dumps(http_params.get("body", {})))
+                http_loop_var.set(str(http_params.get("loop_count", 1)))
+                http_loop_delay_var.set(str(http_params.get("loop_delay", 1.0)))
+            except (json.JSONDecodeError, KeyError):
+                # Set default values if parsing fails
+                http_url_var.set("")
+                http_method_var.set("GET")
+                http_headers_var.set('{"Content-Type": "application/json"}')
+                http_body_var.set("{}")
+                http_loop_var.set("1")
+                http_loop_delay_var.set("1.0")
         
         # Delay
         ttk.Label(edit_window, text="Delay (detik):").grid(row=4, column=0, sticky=tk.W, padx=10, pady=5)
@@ -678,7 +925,7 @@ class AutomationGUI:
         
         # Function to update coordinate visibility
         def update_coord_visibility(*args):
-            if type_var.get() in ["Type Text", "Hotkey", "Delay"]:
+            if type_var.get() in ["Type Text", "Type Text Popup", "Hotkey", "Delay", "HTTP Request"]:
                 coord_frame.grid_remove()  # Hide entire coordinate frame
             else:
                 coord_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=10, pady=5)  # Show coordinate frame
@@ -688,7 +935,10 @@ class AutomationGUI:
             # Hide all parameter widgets first
             for widget in [text_label, text_entry, hotkey_label, hotkey_entry, 
                           scroll_label, scroll_combo, scroll_amount_label, scroll_amount_entry,
-                          drag_label, drag_x_entry, drag_y_label, drag_y_entry, drag_capture_btn]:
+                          drag_label, drag_x_entry, drag_y_label, drag_y_entry, drag_capture_btn,
+                          http_url_label, http_url_entry, http_method_label, http_method_combo,
+                          http_headers_label, http_headers_entry, http_body_label, http_body_entry,
+                          http_loop_label, http_loop_entry, http_loop_delay_label, http_loop_delay_entry]:
                 widget.grid_remove()
             
             # Show relevant parameter widgets based on function type
@@ -696,6 +946,10 @@ class AutomationGUI:
             if func_type == "Type Text":
                 text_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
                 text_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+            elif func_type == "Type Text Popup":
+                # Type Text Popup doesn't need parameters in edit mode
+                # The text will be entered through a popup during execution
+                pass
             elif func_type == "Hotkey":
                 hotkey_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
                 hotkey_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
@@ -710,6 +964,19 @@ class AutomationGUI:
                 drag_y_label.grid(row=0, column=2, sticky=tk.W, padx=(10, 5), pady=5)
                 drag_y_entry.grid(row=0, column=3, padx=5, pady=5)
                 drag_capture_btn.grid(row=0, column=4, padx=(10, 5), pady=5)
+            elif func_type == "HTTP Request":
+                http_url_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+                http_url_entry.grid(row=0, column=1, columnspan=3, sticky=(tk.W, tk.E), padx=5, pady=5)
+                http_method_label.grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+                http_method_combo.grid(row=1, column=1, padx=5, pady=5)
+                http_headers_label.grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+                http_headers_entry.grid(row=2, column=1, columnspan=3, sticky=(tk.W, tk.E), padx=5, pady=5)
+                http_body_label.grid(row=3, column=0, sticky=tk.W, padx=5, pady=5)
+                http_body_entry.grid(row=3, column=1, columnspan=3, sticky=(tk.W, tk.E), padx=5, pady=5)
+                http_loop_label.grid(row=4, column=0, sticky=tk.W, padx=5, pady=5)
+                http_loop_entry.grid(row=4, column=1, padx=5, pady=5)
+                http_loop_delay_label.grid(row=4, column=2, sticky=tk.W, padx=(10, 5), pady=5)
+                http_loop_delay_entry.grid(row=4, column=3, padx=5, pady=5)
         
         type_var.trace("w", update_coord_visibility)
         type_var.trace("w", update_param_visibility)
@@ -758,7 +1025,7 @@ class AutomationGUI:
                 
                 # Get coordinates if needed
                 new_x, new_y = None, None
-                if type_var.get() not in ["Type Text", "Hotkey", "Delay"]:
+                if type_var.get() not in ["Type Text", "Type Text Popup", "Hotkey", "Delay", "HTTP Request"]:
                     try:
                         new_x = int(x_var.get()) if x_var.get() else None
                         new_y = int(y_var.get()) if y_var.get() else None
@@ -775,6 +1042,10 @@ class AutomationGUI:
                     if not parameter:
                         messagebox.showerror("Error", "Masukkan text yang akan diketik!")
                         return
+                elif func_type == "Type Text Popup":
+                    # For Type Text Popup, we don't need parameter validation here
+                    # The text will be entered during execution via popup
+                    parameter = "popup_text"  # Placeholder to indicate popup text input
                 elif func_type == "Hotkey":
                     parameter = hotkey_var.get()
                     if not parameter:
@@ -802,6 +1073,62 @@ class AutomationGUI:
                         messagebox.showerror("Error", "Koordinat drag harus berupa angka!")
                         return
                     parameter = f"to ({drag_x}, {drag_y})"
+                elif func_type == "HTTP Request":
+                    # Validate and construct HTTP Request parameter
+                    url = http_url_var.get().strip()
+                    method = http_method_var.get()
+                    headers_str = http_headers_var.get().strip()
+                    body_str = http_body_var.get().strip()
+                    loop_count_str = http_loop_var.get().strip()
+                    loop_delay_str = http_loop_delay_var.get().strip()
+                    
+                    if not url:
+                        messagebox.showerror("Error", "URL tidak boleh kosong!")
+                        return
+                    
+                    # Validate JSON format for headers
+                    try:
+                        headers = json.loads(headers_str) if headers_str else {}
+                    except json.JSONDecodeError:
+                        messagebox.showerror("Error", "Format headers harus JSON yang valid!")
+                        return
+                    
+                    # Validate JSON format for body
+                    try:
+                        body = json.loads(body_str) if body_str else {}
+                    except json.JSONDecodeError:
+                        messagebox.showerror("Error", "Format body harus JSON yang valid!")
+                        return
+                    
+                    # Validate loop count
+                    try:
+                        loop_count_int = int(loop_count_str) if loop_count_str else 1
+                        if loop_count_int <= 0:
+                            messagebox.showerror("Error", "Loop count harus berupa angka positif!")
+                            return
+                    except ValueError:
+                        messagebox.showerror("Error", "Loop count harus berupa angka!")
+                        return
+                    
+                    # Validate loop delay
+                    try:
+                        loop_delay_float = float(loop_delay_str) if loop_delay_str else 1.0
+                        if loop_delay_float < 0:
+                            messagebox.showerror("Error", "Loop delay harus berupa angka positif!")
+                            return
+                    except ValueError:
+                        messagebox.showerror("Error", "Loop delay harus berupa angka!")
+                        return
+                    
+                    # Construct parameter JSON
+                    parameter = json.dumps({
+                        "url": url,
+                        "method": method,
+                        "headers": headers,
+                        "body": body,
+                        "loop_count": loop_count_int,
+                        "loop_delay": loop_delay_float
+                    })
                 
                 # Update function data
                 self.automation_functions[func_index] = {
@@ -966,11 +1293,12 @@ class AutomationGUI:
                 
                 elif func['type'] == "Type Text":
                     if func['parameter']:
-                        pyautogui.typewrite(func['parameter'])
+                        processed_text = self.process_text_for_typing(func['parameter'])
+                        self.safe_typewrite(processed_text)
                 
                 elif func['type'] == "Type Text Popup":
                     # Show popup to get text input
-                    popup_result = self.show_text_input_popup()
+                    popup_result = self.show_text_input_popup(func.get('name', 'Fungsi'))
                     if popup_result["confirmed"] and popup_result["text"]:
                         # Wait 2 seconds after OK is clicked before moving cursor
                         time.sleep(2)
@@ -983,8 +1311,9 @@ class AutomationGUI:
                         
                         # Wait 1 second before typing
                         time.sleep(1)
-                        # Type the entered text
-                        pyautogui.typewrite(popup_result["text"])
+                        # Process and type the entered text
+                        processed_text = self.process_text_for_typing(popup_result["text"])
+                        self.safe_typewrite(processed_text)
                     elif not popup_result["confirmed"]:
                         # If cancelled, skip this function
                         continue
@@ -1018,6 +1347,74 @@ class AutomationGUI:
                             # Move to start position first, then drag to target position
                             pyautogui.moveTo(func['x'], func['y'])
                             pyautogui.dragTo(target_x, target_y, duration=1, button='left')
+                
+                elif func['type'] == "HTTP Request":
+                    if func['parameter']:
+                        try:
+                            # Parse HTTP request parameters
+                            http_params = json.loads(func['parameter'])
+                            url = http_params.get('url', '')
+                            method = http_params.get('method', 'GET').upper()
+                            headers_str = http_params.get('headers', '{}')
+                            body_str = http_params.get('body', '')
+                            loop_count = http_params.get('loop_count', 1)
+                            loop_delay = http_params.get('loop_delay', 1.0)
+                            
+                            # Parse headers and body JSON
+                            headers = json.loads(headers_str) if headers_str else {}
+                            body_data = json.loads(body_str) if body_str else None
+                            
+                            # Execute HTTP requests with looping
+                            for loop_i in range(loop_count):
+                                if not self.is_running:
+                                    break
+                                
+                                # Update status for loop iteration
+                                if loop_count > 1:
+                                    self.status_label.config(text=f"Menjalankan: {func.get('name', 'Unnamed')} - Loop {loop_i+1}/{loop_count} ({i+1}/{total_functions})")
+                                    self.root.update()
+                                
+                                # Make HTTP request
+                                response = None
+                                if method == 'GET':
+                                    response = requests.get(url, headers=headers, timeout=30)
+                                elif method == 'POST':
+                                    if body_data:
+                                        response = requests.post(url, headers=headers, json=body_data, timeout=30)
+                                    else:
+                                        response = requests.post(url, headers=headers, timeout=30)
+                                elif method == 'PUT':
+                                    if body_data:
+                                        response = requests.put(url, headers=headers, json=body_data, timeout=30)
+                                    else:
+                                        response = requests.put(url, headers=headers, timeout=30)
+                                elif method == 'DELETE':
+                                    response = requests.delete(url, headers=headers, timeout=30)
+                                elif method == 'PATCH':
+                                    if body_data:
+                                        response = requests.patch(url, headers=headers, json=body_data, timeout=30)
+                                    else:
+                                        response = requests.patch(url, headers=headers, timeout=30)
+                                
+                                # Log response status
+                                if response:
+                                    print(f"HTTP {method} {url} - Status: {response.status_code}")
+                                    if response.status_code >= 400:
+                                        print(f"Response: {response.text}")
+                                
+                                # Apply loop delay if not the last iteration
+                                if loop_i < loop_count - 1 and loop_delay > 0:
+                                    time.sleep(loop_delay)
+                                    
+                        except requests.exceptions.RequestException as e:
+                            print(f"HTTP Request Error: {str(e)}")
+                            messagebox.showwarning("HTTP Error", f"HTTP Request gagal: {str(e)}")
+                        except json.JSONDecodeError as e:
+                            print(f"JSON Parse Error: {str(e)}")
+                            messagebox.showwarning("JSON Error", f"Error parsing JSON: {str(e)}")
+                        except Exception as e:
+                            print(f"Unexpected Error: {str(e)}")
+                            messagebox.showwarning("Error", f"Error pada HTTP Request: {str(e)}")
                 
                 # Apply delay after function execution
                 if func['delay'] > 0:
