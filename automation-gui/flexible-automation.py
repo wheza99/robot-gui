@@ -6,6 +6,11 @@ import threading
 import json
 import requests
 import pyperclip
+from pynput import keyboard
+import cv2
+import numpy as np
+from PIL import Image, ImageTk
+import os
 
 class AutomationGUI:
     def __init__(self, root):
@@ -17,11 +22,67 @@ class AutomationGUI:
         self.automation_functions = []
         self.is_running = False
         self.current_thread = None
+        self.emergency_stop = False
+        self.hotkey_listener = None
         
-        # Disable pyautogui failsafe untuk mencegah error
-        pyautogui.FAILSAFE = False
+        # Enable pyautogui failsafe as backup (move mouse to top-left corner)
+        pyautogui.FAILSAFE = True
+        
+        # Setup emergency stop hotkey listener
+        self.setup_emergency_stop()
         
         self.setup_ui()
+    
+    def setup_emergency_stop(self):
+        """Setup global hotkey listener for emergency stop (Ctrl+Alt+Q)"""
+        def on_hotkey():
+            self.trigger_emergency_stop()
+        
+        try:
+            # Setup global hotkey listener for Ctrl+Alt+Q
+            self.hotkey_listener = keyboard.GlobalHotKeys({
+                '<ctrl>+<alt>+q': on_hotkey
+            })
+            self.hotkey_listener.start()
+        except Exception as e:
+            print(f"Warning: Could not setup emergency hotkey: {e}")
+    
+    def trigger_emergency_stop(self):
+        """Trigger emergency stop for automation"""
+        self.emergency_stop = True
+        self.is_running = False
+        
+        # Update UI in main thread
+        self.root.after(0, self._update_emergency_stop_ui)
+        
+        print("🚨 EMERGENCY STOP ACTIVATED! (Ctrl+Alt+Q pressed)")
+    
+    def _update_emergency_stop_ui(self):
+        """Update UI after emergency stop (must run in main thread)"""
+        self.start_btn.config(state=tk.NORMAL)
+        self.stop_btn.config(state=tk.DISABLED)
+        self.status_label.config(text="🚨 EMERGENCY STOP! Automation dihentikan paksa!")
+        self.progress['value'] = 0
+        
+        # Show emergency stop message
+        messagebox.showwarning("Emergency Stop", 
+                             "Automation dihentikan dengan emergency stop!\n\n"
+                             "Hotkey: Ctrl+Alt+Q\n"
+                             "PyAutoGUI Failsafe: Gerakkan mouse ke pojok kiri atas")
+    
+    def reset_emergency_stop(self):
+        """Reset emergency stop flag"""
+        self.emergency_stop = False
+        if hasattr(self, 'status_label'):
+            self.status_label.config(text="Status: Siap")
+    
+    def cleanup_emergency_stop(self):
+        """Cleanup emergency stop listener when closing application"""
+        if self.hotkey_listener:
+            try:
+                self.hotkey_listener.stop()
+            except:
+                pass
     
     def setup_ui(self):
         # Main frame
@@ -52,7 +113,7 @@ class AutomationGUI:
         # Function Type Selection
         ttk.Label(add_frame, text="Pilih Fungsi:").grid(row=0, column=2, sticky=tk.W, padx=(20, 10))
         self.function_type = ttk.Combobox(add_frame, values=[
-            "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click", "HTTP Request"
+            "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click", "HTTP Request", "Wait for Image"
         ], state="readonly", width=15)
         self.function_type.grid(row=0, column=3, sticky=(tk.W, tk.E), padx=(0, 10))
         self.function_type.bind("<<ComboboxSelected>>", self.on_function_type_change)
@@ -131,6 +192,23 @@ class AutomationGUI:
         self.http_loop_delay_label = ttk.Label(param_frame, text="Loop Delay (s):")
         self.http_loop_delay_entry = ttk.Entry(param_frame, width=8)
         self.http_loop_delay_entry.insert(0, "1.0")
+        
+        # Wait for Image parameters
+        self.image_label = ttk.Label(param_frame, text="Template Image:")
+        self.image_path_entry = ttk.Entry(param_frame, width=40)
+        self.image_browse_btn = ttk.Button(param_frame, text="Browse", command=self.browse_image_file)
+        self.image_capture_btn = ttk.Button(param_frame, text="Capture Screen", command=self.capture_screen_region)
+        
+        self.image_threshold_label = ttk.Label(param_frame, text="Threshold:")
+        self.image_threshold_entry = ttk.Entry(param_frame, width=8)
+        self.image_threshold_entry.insert(0, "0.8")
+        
+        self.image_timeout_label = ttk.Label(param_frame, text="Timeout (s):")
+        self.image_timeout_entry = ttk.Entry(param_frame, width=8)
+        self.image_timeout_entry.insert(0, "30")
+        
+        self.image_preview_label = ttk.Label(param_frame, text="Preview:")
+        self.image_preview = ttk.Label(param_frame, text="No image selected", relief="sunken", width=20)
         
         # Store param_frame reference for later use
         self.param_frame = param_frame
@@ -211,6 +289,11 @@ class AutomationGUI:
         # Status and progress
         self.status_label = ttk.Label(control_frame, text="Status: Siap")
         self.status_label.grid(row=0, column=0, sticky=tk.W, pady=(0, 10))
+        
+        # Emergency stop indicator
+        self.emergency_stop_label = ttk.Label(control_frame, text="Emergency Stop: Ctrl+Alt+Q", 
+                                            foreground="red", font=("Arial", 9, "bold"))
+        self.emergency_stop_label.grid(row=0, column=1, sticky=tk.E, pady=(0, 10))
         
         self.progress = ttk.Progressbar(control_frame, mode='determinate')
         self.progress.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
@@ -311,6 +394,22 @@ class AutomationGUI:
             self.http_loop_entry.grid(row=3, column=1, sticky=tk.W, padx=(0, 10), pady=(5, 0))
             self.http_loop_delay_label.grid(row=3, column=2, sticky=tk.W, padx=(10, 10), pady=(5, 0))
             self.http_loop_delay_entry.grid(row=3, column=3, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+        elif func_type == "Wait for Image":
+            # Row 0: Image file selection
+            self.image_label.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+            self.image_path_entry.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=(0, 10))
+            self.image_browse_btn.grid(row=0, column=3, padx=(5, 5))
+            self.image_capture_btn.grid(row=0, column=4, padx=(5, 0))
+            
+            # Row 1: Threshold and Timeout
+            self.image_threshold_label.grid(row=1, column=0, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+            self.image_threshold_entry.grid(row=1, column=1, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+            self.image_timeout_label.grid(row=1, column=2, sticky=tk.W, padx=(10, 10), pady=(5, 0))
+            self.image_timeout_entry.grid(row=1, column=3, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+            
+            # Row 2: Preview
+            self.image_preview_label.grid(row=2, column=0, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+            self.image_preview.grid(row=2, column=1, columnspan=3, sticky=tk.W, padx=(0, 10), pady=(5, 0))
     
     def hide_all_parameters(self):
         """Hide all parameter widgets"""
@@ -321,7 +420,10 @@ class AutomationGUI:
             self.drag_label, self.drag_x_label, self.drag_x, self.drag_y_label, self.drag_y, self.drag_capture_btn,
             self.http_url_label, self.http_url_entry, self.http_method_label, self.http_method,
             self.http_headers_label, self.http_headers_entry, self.http_body_label, self.http_body_entry,
-            self.http_loop_label, self.http_loop_entry, self.http_loop_delay_label, self.http_loop_delay_entry
+            self.http_loop_label, self.http_loop_entry, self.http_loop_delay_label, self.http_loop_delay_entry,
+            self.image_label, self.image_path_entry, self.image_browse_btn, self.image_capture_btn,
+            self.image_threshold_label, self.image_threshold_entry, self.image_timeout_label, self.image_timeout_entry,
+            self.image_preview_label, self.image_preview
         ]
         for widget in widgets_to_hide:
             widget.grid_remove()
@@ -342,6 +444,169 @@ class AutomationGUI:
             self.status_label.config(text=f"Koordinat captured: ({pos.x}, {pos.y})")
         
         threading.Thread(target=capture, daemon=True).start()
+    
+    def browse_image_file(self):
+        """Browse for image file"""
+        file_path = filedialog.askopenfilename(
+            title="Pilih gambar template",
+            filetypes=[
+                ("Image files", "*.png *.jpg *.jpeg *.bmp *.tiff"),
+                ("All files", "*.*")
+            ]
+        )
+        if file_path:
+            self.image_path_entry.delete(0, tk.END)
+            self.image_path_entry.insert(0, file_path)
+            self.update_image_preview(file_path)
+    
+    def capture_screen_region(self):
+        """Capture a region of the screen as template image"""
+        self.root.withdraw()  # Hide main window
+        
+        # Create a fullscreen transparent window for selection
+        capture_window = tk.Toplevel()
+        capture_window.attributes('-fullscreen', True)
+        capture_window.attributes('-alpha', 0.3)
+        capture_window.configure(bg='black')
+        capture_window.attributes('-topmost', True)
+        
+        # Variables for selection
+        start_x = start_y = end_x = end_y = 0
+        selection_rect = None
+        
+        canvas = tk.Canvas(capture_window, highlightthickness=0)
+        canvas.pack(fill=tk.BOTH, expand=True)
+        
+        def on_mouse_press(event):
+            nonlocal start_x, start_y, selection_rect
+            start_x, start_y = event.x, event.y
+            if selection_rect:
+                canvas.delete(selection_rect)
+        
+        def on_mouse_drag(event):
+            nonlocal selection_rect, end_x, end_y
+            end_x, end_y = event.x, event.y
+            if selection_rect:
+                canvas.delete(selection_rect)
+            selection_rect = canvas.create_rectangle(
+                start_x, start_y, end_x, end_y, 
+                outline='red', width=2
+            )
+        
+        def on_mouse_release(event):
+            nonlocal end_x, end_y
+            end_x, end_y = event.x, event.y
+            
+            # Capture the selected region
+            if abs(end_x - start_x) > 10 and abs(end_y - start_y) > 10:
+                # Ensure coordinates are in correct order
+                left = min(start_x, end_x)
+                top = min(start_y, end_y)
+                right = max(start_x, end_x)
+                bottom = max(start_y, end_y)
+                
+                # Take screenshot of the selected region
+                screenshot = pyautogui.screenshot(region=(left, top, right-left, bottom-top))
+                
+                # Save to temp file
+                temp_dir = os.path.join(os.path.dirname(__file__), 'temp_images')
+                os.makedirs(temp_dir, exist_ok=True)
+                
+                timestamp = int(time.time())
+                temp_path = os.path.join(temp_dir, f'captured_template_{timestamp}.png')
+                screenshot.save(temp_path)
+                
+                # Update UI
+                self.image_path_entry.delete(0, tk.END)
+                self.image_path_entry.insert(0, temp_path)
+                self.update_image_preview(temp_path)
+                
+                capture_window.destroy()
+                self.root.deiconify()  # Show main window
+            else:
+                capture_window.destroy()
+                self.root.deiconify()
+                messagebox.showwarning("Peringatan", "Area yang dipilih terlalu kecil!")
+        
+        def on_escape(event):
+            capture_window.destroy()
+            self.root.deiconify()
+        
+        canvas.bind('<Button-1>', on_mouse_press)
+        canvas.bind('<B1-Motion>', on_mouse_drag)
+        canvas.bind('<ButtonRelease-1>', on_mouse_release)
+        capture_window.bind('<Escape>', on_escape)
+        
+        # Instructions
+        instruction_label = tk.Label(
+            capture_window, 
+            text="Drag untuk memilih area gambar template. Tekan ESC untuk membatalkan.",
+            fg='white', bg='black', font=('Arial', 12)
+        )
+        instruction_label.pack(pady=20)
+    
+    def update_image_preview(self, image_path):
+        """Update image preview"""
+        try:
+            # Load and resize image for preview
+            pil_image = Image.open(image_path)
+            
+            # Calculate size to fit in preview (max 150x150)
+            max_size = 150
+            pil_image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+            
+            # Convert to PhotoImage
+            photo = ImageTk.PhotoImage(pil_image)
+            
+            # Update preview label
+            self.image_preview.config(image=photo)
+            self.image_preview.image = photo  # Keep a reference
+            
+        except Exception as e:
+            self.image_preview.config(image='', text=f"Error: {str(e)}")
+    
+    def wait_for_image(self, template_path, threshold=0.8, timeout=30):
+        """Wait for image to appear on screen using template matching"""
+        if not os.path.exists(template_path):
+            return False, "Template image file not found"
+        
+        try:
+            # Load template image
+            template = cv2.imread(template_path, cv2.IMREAD_COLOR)
+            if template is None:
+                return False, "Could not load template image"
+            
+            template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+            template_h, template_w = template_gray.shape
+            
+            start_time = time.time()
+            
+            while time.time() - start_time < timeout:
+                if self.emergency_stop or not self.is_running:
+                    return False, "Stopped by user"
+                
+                # Take screenshot
+                screenshot = pyautogui.screenshot()
+                screenshot_np = np.array(screenshot)
+                screenshot_bgr = cv2.cvtColor(screenshot_np, cv2.COLOR_RGB2BGR)
+                screenshot_gray = cv2.cvtColor(screenshot_bgr, cv2.COLOR_BGR2GRAY)
+                
+                # Template matching
+                result = cv2.matchTemplate(screenshot_gray, template_gray, cv2.TM_CCOEFF_NORMED)
+                min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+                
+                if max_val >= threshold:
+                    # Image found
+                    center_x = max_loc[0] + template_w // 2
+                    center_y = max_loc[1] + template_h // 2
+                    return True, f"Image found at ({center_x}, {center_y}) with confidence {max_val:.2f}"
+                
+                time.sleep(0.5)  # Check every 500ms
+            
+            return False, f"Image not found within {timeout} seconds"
+            
+        except Exception as e:
+            return False, f"Error during image matching: {str(e)}"
     
     def show_text_input_popup(self, function_name=None):
         """Show popup window for text input and return the entered text"""
@@ -655,6 +920,44 @@ class AutomationGUI:
                     "loop_count": loop_count_int,
                     "loop_delay": loop_delay_float
                 })
+            elif func_type == "Wait for Image":
+                image_path = self.image_path_entry.get().strip()
+                threshold = self.image_threshold_entry.get().strip()
+                timeout = self.image_timeout_entry.get().strip()
+                
+                if not image_path:
+                    messagebox.showwarning("Warning", "Pilih atau capture gambar template!")
+                    return
+                
+                if not os.path.exists(image_path):
+                    messagebox.showwarning("Warning", "File gambar template tidak ditemukan!")
+                    return
+                
+                # Validate threshold
+                try:
+                    threshold_float = float(threshold) if threshold else 0.8
+                    if not (0.0 <= threshold_float <= 1.0):
+                        messagebox.showwarning("Warning", "Threshold harus antara 0.0 dan 1.0!")
+                        return
+                except ValueError:
+                    messagebox.showwarning("Warning", "Threshold harus berupa angka!")
+                    return
+                
+                # Validate timeout
+                try:
+                    timeout_int = int(timeout) if timeout else 30
+                    if timeout_int < 1:
+                        messagebox.showwarning("Warning", "Timeout harus minimal 1 detik!")
+                        return
+                except ValueError:
+                    messagebox.showwarning("Warning", "Timeout harus berupa angka!")
+                    return
+                
+                parameter = json.dumps({
+                    "image_path": image_path,
+                    "threshold": threshold_float,
+                    "timeout": timeout_int
+                })
             
             # Create function object
             function = {
@@ -707,6 +1010,14 @@ class AutomationGUI:
         self.http_loop_entry.insert(0, "1")
         self.http_loop_delay_entry.delete(0, tk.END)
         self.http_loop_delay_entry.insert(0, "1.0")
+        
+        # Clear Wait for Image fields
+        self.image_path_entry.delete(0, tk.END)
+        self.image_threshold_entry.delete(0, tk.END)
+        self.image_threshold_entry.insert(0, "0.8")
+        self.image_timeout_entry.delete(0, tk.END)
+        self.image_timeout_entry.insert(0, "30")
+        self.image_preview.config(image='', text="No image")
         
         self.hide_all_parameters()
     
@@ -761,7 +1072,7 @@ class AutomationGUI:
         ttk.Label(edit_window, text="Jenis Fungsi:").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
         type_var = tk.StringVar(value=func_data["type"])
         type_combo = ttk.Combobox(edit_window, textvariable=type_var, values=[
-            "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click", "HTTP Request"
+            "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click", "HTTP Request", "Wait for Image"
         ], state="readonly", width=27)
         type_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=10, pady=5)
         
@@ -1217,6 +1528,9 @@ class AutomationGUI:
             messagebox.showwarning("Warning", "Tambahkan minimal satu fungsi automation!")
             return
         
+        # Reset emergency stop flag before starting
+        self.reset_emergency_stop()
+        
         self.is_running = True
         self.start_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
@@ -1272,7 +1586,8 @@ class AutomationGUI:
             self.progress['maximum'] = total_functions
             
             for i, func in enumerate(enabled_functions):
-                if not self.is_running:
+                # Check for emergency stop or normal stop
+                if not self.is_running or self.emergency_stop:
                     break
                 
                 self.status_label.config(text=f"Menjalankan: {func.get('name', 'Unnamed')} ({i+1}/{total_functions})")
@@ -1416,6 +1731,36 @@ class AutomationGUI:
                             print(f"Unexpected Error: {str(e)}")
                             messagebox.showwarning("Error", f"Error pada HTTP Request: {str(e)}")
                 
+                elif func['type'] == "Wait for Image":
+                    if func['parameter']:
+                        try:
+                            # Parse Wait for Image parameters
+                            image_params = json.loads(func['parameter'])
+                            image_path = image_params.get('image_path', '')
+                            threshold = image_params.get('threshold', 0.8)
+                            timeout = image_params.get('timeout', 30)
+                            
+                            # Update status to show waiting
+                            self.status_label.config(text=f"Menunggu gambar: {func.get('name', 'Unnamed')} ({i+1}/{total_functions})")
+                            self.root.update()
+                            
+                            # Wait for image to appear
+                            success, message = self.wait_for_image(image_path, threshold, timeout)
+                            
+                            if success:
+                                print(f"Wait for Image Success: {message}")
+                            else:
+                                print(f"Wait for Image Failed: {message}")
+                                if "Stopped by user" not in message:
+                                    messagebox.showwarning("Wait for Image", f"Gambar tidak ditemukan: {message}")
+                                
+                        except json.JSONDecodeError as e:
+                            print(f"JSON Parse Error in Wait for Image: {str(e)}")
+                            messagebox.showwarning("JSON Error", f"Error parsing Wait for Image parameters: {str(e)}")
+                        except Exception as e:
+                            print(f"Unexpected Error in Wait for Image: {str(e)}")
+                            messagebox.showwarning("Error", f"Error pada Wait for Image: {str(e)}")
+                
                 # Apply delay after function execution
                 if func['delay'] > 0:
                     time.sleep(func['delay'])
@@ -1488,6 +1833,13 @@ class AutomationGUI:
 def main():
     root = tk.Tk()
     app = AutomationGUI(root)
+    
+    # Ensure cleanup on window close
+    def on_closing():
+        app.cleanup_emergency_stop()
+        root.destroy()
+    
+    root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
 
 if __name__ == "__main__":
