@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 import os
+from functions.treeview_handlers import on_treeview_click
 
 class AutomationGUI:
     def __init__(self, root):
@@ -332,21 +333,8 @@ class AutomationGUI:
         # Initially hide parameter widgets
         self.hide_all_parameters()
     
-    def on_treeview_click(self, event):
-        """Handle treeview click to toggle enabled status"""
-        region = self.functions_tree.identify_region(event.x, event.y)
-        if region == "cell":
-            column = self.functions_tree.identify_column(event.x)
-            if column == "#1":  # First column (Enabled)
-                item = self.functions_tree.identify_row(event.y)
-                if item:
-                    # Get the index of the clicked item
-                    item_index = self.functions_tree.index(item)
-                    if 0 <= item_index < len(self.automation_functions):
-                        # Toggle enabled status
-                        self.automation_functions[item_index]['enabled'] = not self.automation_functions[item_index].get('enabled', True)
-                        # Update the display
-                        self.update_functions_list()
+    # Import the on_treeview_click method from the separate module
+    on_treeview_click = on_treeview_click
     
     def on_function_type_change(self, event=None):
         """Handle function type selection change"""
