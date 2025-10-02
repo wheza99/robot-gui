@@ -21,6 +21,7 @@ from functions.list_management import update_functions_list
 from functions.edit_management import edit_function
 from functions.removal_management import remove_function
 from functions.movement_management import move_up, move_down
+from functions.clearing_management import clear_all
 
 class AutomationGUI:
     def __init__(self, root):
@@ -399,12 +400,8 @@ class AutomationGUI:
     # Assign the imported move_down function
     move_down = move_down
     
-    def clear_all(self):
-        """Clear all functions"""
-        if messagebox.askyesno("Konfirmasi", "Hapus semua fungsi?"):
-            self.automation_functions.clear()
-            self.update_functions_list()
-            self.status_label.config(text="Semua fungsi berhasil dihapus!")
+    # Assign the imported clear_all function
+    clear_all = clear_all
     
     def start_automation(self):
         """Start the automation process"""
