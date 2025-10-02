@@ -16,7 +16,7 @@ from functions.function_type_handlers import on_function_type_change
 from functions.parameter_handlers import hide_all_parameters
 from functions.screen_capture_handlers import capture_screen_region
 from functions.text_input_handlers import show_text_input_popup
-from functions.coordinate_handlers import capture_coordinates
+from functions.coordinate_handlers import capture_coordinates, capture_drag_coordinates
 from functions.image_handlers import browse_image_file, update_image_preview, wait_for_image
 from functions.text_handlers import safe_typewrite, process_text_for_typing
 
@@ -373,22 +373,8 @@ class AutomationGUI:
     # Import the process_text_for_typing method from the separate module
     process_text_for_typing = process_text_for_typing
     
-    def capture_drag_coordinates(self):
-        """Capture mouse coordinates for drag destination after 3 seconds"""
-        def capture():
-            for i in range(3, 0, -1):
-                self.status_label.config(text=f"Capture koordinat drag dalam {i} detik...")
-                self.root.update()
-                time.sleep(1)
-            
-            pos = pyautogui.position()
-            self.drag_x.delete(0, tk.END)
-            self.drag_x.insert(0, str(pos.x))
-            self.drag_y.delete(0, tk.END)
-            self.drag_y.insert(0, str(pos.y))
-            self.status_label.config(text=f"Koordinat drag captured: ({pos.x}, {pos.y})")
-        
-        threading.Thread(target=capture, daemon=True).start()
+    # Import the capture_drag_coordinates method from the separate module
+    capture_drag_coordinates = capture_drag_coordinates
     
     def add_function(self):
         """Add a new automation function"""
