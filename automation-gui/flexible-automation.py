@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 import pyautogui
 import time
 import threading
@@ -7,10 +7,6 @@ import json
 import requests
 import pyperclip
 from pynput import keyboard
-import cv2
-import numpy as np
-from PIL import Image, ImageTk
-import os
 from functions.treeview_handlers import on_treeview_click
 from functions.function_type_handlers import on_function_type_change
 from functions.parameter_handlers import hide_all_parameters
@@ -21,6 +17,7 @@ from functions.image_handlers import browse_image_file, update_image_preview, wa
 from functions.text_handlers import safe_typewrite, process_text_for_typing
 from functions.function_management import add_function
 from functions.input_management import clear_inputs
+from functions.list_management import update_functions_list
 
 class AutomationGUI:
     def __init__(self, root):
@@ -384,24 +381,8 @@ class AutomationGUI:
     # Import the clear_inputs method from the separate module
     clear_inputs = clear_inputs
     
-    def update_functions_list(self):
-        """Update the functions list display"""
-        # Clear existing items
-        for item in self.functions_tree.get_children():
-            self.functions_tree.delete(item)
-        
-        # Update functions list display
-        for i, func in enumerate(self.automation_functions, 1):
-            coord_text = "N/A"
-            if func['type'] not in ["Type Text", "Hotkey", "Delay"]:
-                coord_text = f"({func['x']}, {func['y']})" if func['x'] or func['y'] else "N/A"
-            
-            # Get enabled status with default True for backward compatibility
-            enabled_text = "✓" if func.get('enabled', True) else "X"
-            
-            self.functions_tree.insert("", tk.END, values=(
-                enabled_text, i, func.get('name', 'Unnamed'), func['type'], coord_text, func['parameter'], func['delay']
-            ))
+    # Import the update_functions_list method from the separate module
+    update_functions_list = update_functions_list
     
     def edit_function(self):
         """Edit selected function"""
