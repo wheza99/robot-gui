@@ -22,6 +22,7 @@ from functions.edit_management import edit_function
 from functions.removal_management import remove_function
 from functions.movement_management import move_up, move_down
 from functions.clearing_management import clear_all
+from functions.automation_control import start_automation, stop_automation
 
 class AutomationGUI:
     def __init__(self, root):
@@ -403,52 +404,11 @@ class AutomationGUI:
     # Assign the imported clear_all function
     clear_all = clear_all
     
-    def start_automation(self):
-        """Start the automation process"""
-        if not self.automation_functions:
-            messagebox.showwarning("Warning", "Tambahkan minimal satu fungsi automation!")
-            return
-        
-        # Reset emergency stop flag before starting
-        self.reset_emergency_stop()
-        
-        self.is_running = True
-        self.start_btn.config(state=tk.DISABLED)
-        self.stop_btn.config(state=tk.NORMAL)
-        
-        # Show countdown before starting
-        self.status_label.config(text="Automation akan dimulai dalam 3 detik...")
-        self.root.update()
-        time.sleep(1)
-        
-        if not self.is_running:  # Check if stopped during countdown
-            return
-            
-        self.status_label.config(text="Automation akan dimulai dalam 2 detik...")
-        self.root.update()
-        time.sleep(1)
-        
-        if not self.is_running:  # Check if stopped during countdown
-            return
-            
-        self.status_label.config(text="Automation akan dimulai dalam 1 detik...")
-        self.root.update()
-        time.sleep(1)
-        
-        if not self.is_running:  # Check if stopped during countdown
-            return
-        
-        # Start automation in separate thread
-        self.current_thread = threading.Thread(target=self.run_automation, daemon=True)
-        self.current_thread.start()
+    # Assign the imported start_automation function
+    start_automation = start_automation
     
-    def stop_automation(self):
-        """Stop the automation process"""
-        self.is_running = False
-        self.start_btn.config(state=tk.NORMAL)
-        self.stop_btn.config(state=tk.DISABLED)
-        self.status_label.config(text="Automation dihentikan!")
-        self.progress['value'] = 0
+    # Assign the imported stop_automation function
+    stop_automation = stop_automation
     
     def run_automation(self):
         """Execute all automation functions in sequence"""
