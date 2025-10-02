@@ -24,6 +24,7 @@ from functions.movement_management import move_up, move_down
 from functions.clearing_management import clear_all
 from functions.automation_control import start_automation, stop_automation
 from functions.automation_execution import run_automation
+from functions.config_management import save_config, load_config
 
 class AutomationGUI:
     def __init__(self, root):
@@ -414,55 +415,11 @@ class AutomationGUI:
     # Automation execution function
     run_automation = run_automation
     
-    def save_config(self):
-        """Save automation configuration to file"""
-        if not self.automation_functions:
-            messagebox.showwarning("Warning", "Tidak ada fungsi untuk disimpan!")
-            return
-        
-        try:
-            from tkinter import filedialog
-            filename = filedialog.asksaveasfilename(
-                defaultextension=".json",
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-            )
-            if filename:
-                with open(filename, 'w', encoding='utf-8') as f:
-                    json.dump(self.automation_functions, f, indent=2, ensure_ascii=False)
-                messagebox.showinfo("Berhasil", f"Konfigurasi disimpan ke {filename}")
-        except Exception as e:
-            messagebox.showerror("Error", f"Gagal menyimpan: {str(e)}")
+    # Assign the imported save_config function
+    save_config = save_config
     
-    def load_config(self):
-        """Load automation configuration from file"""
-        try:
-            from tkinter import filedialog
-            filename = filedialog.askopenfilename(
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-            )
-            if filename:
-                with open(filename, 'r', encoding='utf-8') as f:
-                    loaded_functions = json.load(f)
-                
-                # Ensure backward compatibility and data type consistency
-                for func in loaded_functions:
-                    if 'enabled' not in func:
-                        func['enabled'] = True
-                    
-                    # Convert delay to float to ensure consistent data type
-                    if 'delay' in func:
-                        try:
-                            func['delay'] = float(func['delay'])
-                        except (ValueError, TypeError):
-                            func['delay'] = 1.0  # Default delay if conversion fails
-                    else:
-                        func['delay'] = 1.0  # Default delay if missing
-                
-                self.automation_functions = loaded_functions
-                self.update_functions_list()
-                messagebox.showinfo("Berhasil", f"Konfigurasi dimuat dari {filename}")
-        except Exception as e:
-            messagebox.showerror("Error", f"Gagal memuat: {str(e)}")
+    # Assign the imported load_config function
+    load_config = load_config
     
     def show_variable_manager(self):
         """Show Variable Manager window"""
