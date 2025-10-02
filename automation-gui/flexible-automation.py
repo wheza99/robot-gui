@@ -19,6 +19,7 @@ from functions.function_management import add_function
 from functions.input_management import clear_inputs
 from functions.list_management import update_functions_list
 from functions.edit_management import edit_function
+from functions.removal_management import remove_function
 
 class AutomationGUI:
     def __init__(self, root):
@@ -388,18 +389,8 @@ class AutomationGUI:
     # Assign the imported edit_function
     edit_function = edit_function
     
-    def remove_function(self):
-        """Remove selected function"""
-        selection = self.functions_tree.selection()
-        if not selection:
-            messagebox.showwarning("Warning", "Pilih fungsi yang akan dihapus!")
-            return
-        
-        item = selection[0]
-        index = self.functions_tree.index(item)
-        del self.automation_functions[index]
-        self.update_functions_list()
-        self.status_label.config(text="Fungsi berhasil dihapus!")
+    # Assign the imported remove_function
+    remove_function = remove_function
     
     def move_up(self):
         """Move selected function up"""
