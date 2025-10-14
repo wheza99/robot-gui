@@ -17,7 +17,7 @@ from functions.removal_management import remove_function
 from functions.movement_management import move_up, move_down
 from functions.clearing_management import clear_all
 from functions.automation_control import start_automation, stop_automation
-from functions.automation_execution import run_automation
+from functions.automation_execution import run_automation, execute_single_function
 from functions.config_management import save_config, load_config
 from functions.variable_management import show_variable_manager
 from functions.emergency_management import setup_emergency_stop, trigger_emergency_stop, _update_emergency_stop_ui, reset_emergency_stop, cleanup_emergency_stop
@@ -75,7 +75,7 @@ class AutomationGUI:
         # Function Type Selection
         ttk.Label(add_frame, text="Pilih Fungsi:").grid(row=0, column=2, sticky=tk.W, padx=(20, 10))
         self.function_type = ttk.Combobox(add_frame, values=[
-            "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click", "HTTP Request", "Wait for Image", "Set Variable", "Get Variable"
+            "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click", "HTTP Request", "Wait for Image", "Set Variable", "Get Variable", "Start Loop", "End Loop"
         ], state="readonly", width=15)
         self.function_type.grid(row=0, column=3, sticky=(tk.W, tk.E), padx=(0, 10))
         self.function_type.bind("<<ComboboxSelected>>", self.on_function_type_change)
@@ -184,6 +184,21 @@ class AutomationGUI:
             "Manual Input", "Clipboard", "Current Time", "Random Number", "Screen Text (OCR)", "Last Click Position"
         ], state="readonly", width=20)
         self.variable_source_combo.set("Manual Input")
+        
+        # Loop parameters
+        self.loop_count_label = ttk.Label(param_frame, text="Loop Count:")
+        self.loop_count_entry = ttk.Entry(param_frame, width=8)
+        self.loop_count_entry.insert(0, "1")
+        
+        self.loop_delay_label = ttk.Label(param_frame, text="Loop Delay (s):")
+        self.loop_delay_entry = ttk.Entry(param_frame, width=8)
+        self.loop_delay_entry.insert(0, "1.0")
+        
+        self.loop_type_label = ttk.Label(param_frame, text="Loop Type:")
+        self.loop_type_combo = ttk.Combobox(param_frame, values=[
+            "Fixed Count", "Infinite", "Until Condition"
+        ], state="readonly", width=15)
+        self.loop_type_combo.set("Fixed Count")
         
         # Store param_frame reference for later use
         self.param_frame = param_frame
@@ -359,6 +374,9 @@ class AutomationGUI:
     
     # Automation execution function
     run_automation = run_automation
+    
+    # Single function execution
+    execute_single_function = execute_single_function
     
     # Assign the imported save_config function
     save_config = save_config

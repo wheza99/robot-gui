@@ -98,3 +98,16 @@ def on_function_type_change(self, event=None):
         # Row 0: Variable Name to retrieve
         self.variable_name_label.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
         self.variable_name_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+    elif func_type == "Start Loop":
+        # Row 0: Loop Type and Count
+        self.loop_type_label.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        self.loop_type_combo.grid(row=0, column=1, sticky=tk.W, padx=(0, 10))
+        self.loop_count_label.grid(row=0, column=2, sticky=tk.W, padx=(10, 10))
+        self.loop_count_entry.grid(row=0, column=3, sticky=tk.W, padx=(0, 10))
+        
+        # Row 1: Loop Delay
+        self.loop_delay_label.grid(row=1, column=0, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+        self.loop_delay_entry.grid(row=1, column=1, sticky=tk.W, padx=(0, 10), pady=(5, 0))
+    elif func_type == "End Loop":
+        # End Loop doesn't need parameters
+        pass

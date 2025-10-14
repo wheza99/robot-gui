@@ -261,6 +261,115 @@ def run_automation(self):
                         print(f"Unexpected Error in Get Variable: {str(e)}")
                         messagebox.showwarning("Error", f"Error pada Get Variable: {str(e)}")
             
+            elif func['type'] == "Start Loop":
+                if func['parameter']:
+                    try:
+                        # Parse Start Loop parameters
+                        loop_params = json.loads(func['parameter'])
+                        loop_type = loop_params.get('loop_type', 'Fixed Count')
+                        loop_count = int(loop_params.get('loop_count', 1))
+                        loop_delay = float(loop_params.get('loop_delay', 1.0))
+                        
+                        # Find the matching End Loop
+                        end_loop_index = None
+                        loop_depth = 0
+                        
+                        for j in range(i + 1, len(enabled_functions)):
+                            if enabled_functions[j]['type'] == "Start Loop":
+                                loop_depth += 1
+                            elif enabled_functions[j]['type'] == "End Loop":
+                                if loop_depth == 0:
+                                    end_loop_index = j
+                                    break
+                                else:
+                                    loop_depth -= 1
+                        
+                        if end_loop_index is None:
+                            messagebox.showwarning("Error", f"Start Loop '{func.get('name', 'Unnamed')}' tidak memiliki End Loop yang sesuai!")
+                            continue
+                        
+                        # Get functions between Start Loop and End Loop
+                        loop_functions = enabled_functions[i + 1:end_loop_index]
+                        
+                        # Execute loop based on type
+                        if loop_type == "Fixed Count":
+                            for loop_i in range(loop_count):
+                                if not self.is_running or self.emergency_stop:
+                                    break
+                                
+                                # Update status for loop iteration
+                                self.status_label.config(text=f"Loop: {func.get('name', 'Unnamed')} - Iterasi {loop_i+1}/{loop_count}")
+                                self.root.update()
+                                
+                                # Apply loop delay if not the first iteration
+                                if loop_i > 0 and loop_delay > 0:
+                                    time.sleep(loop_delay)
+                                
+                                # Execute functions within the loop
+                                for loop_func in loop_functions:
+                                    if not self.is_running or self.emergency_stop:
+                                        break
+                                    
+                                    # Execute the function (reuse existing execution logic)
+                                    self.execute_single_function(loop_func)
+                        
+                        elif loop_type == "Infinite":
+                            loop_i = 0
+                            while self.is_running and not self.emergency_stop:
+                                loop_i += 1
+                                
+                                # Update status for infinite loop
+                                self.status_label.config(text=f"Loop Infinite: {func.get('name', 'Unnamed')} - Iterasi {loop_i}")
+                                self.root.update()
+                                
+                                # Apply loop delay
+                                if loop_delay > 0:
+                                    time.sleep(loop_delay)
+                                
+                                # Execute functions within the loop
+                                for loop_func in loop_functions:
+                                    if not self.is_running or self.emergency_stop:
+                                        break
+                                    
+                                    # Execute the function (reuse existing execution logic)
+                                    self.execute_single_function(loop_func)
+                        
+                        elif loop_type == "Until Condition":
+                            # For now, implement as fixed count (can be extended later)
+                            for loop_i in range(loop_count):
+                                if not self.is_running or self.emergency_stop:
+                                    break
+                                
+                                # Update status for conditional loop
+                                self.status_label.config(text=f"Loop Kondisi: {func.get('name', 'Unnamed')} - Iterasi {loop_i+1}/{loop_count}")
+                                self.root.update()
+                                
+                                # Apply loop delay if not the first iteration
+                                if loop_i > 0 and loop_delay > 0:
+                                    time.sleep(loop_delay)
+                                
+                                # Execute functions within the loop
+                                for loop_func in loop_functions:
+                                    if not self.is_running or self.emergency_stop:
+                                        break
+                                    
+                                    # Execute the function (reuse existing execution logic)
+                                    self.execute_single_function(loop_func)
+                        
+                        # Skip to after the End Loop
+                        i = end_loop_index
+                        
+                    except json.JSONDecodeError as e:
+                        print(f"JSON Parse Error in Start Loop: {str(e)}")
+                        messagebox.showwarning("JSON Error", f"Error parsing Start Loop parameters: {str(e)}")
+                    except Exception as e:
+                        print(f"Unexpected Error in Start Loop: {str(e)}")
+                        messagebox.showwarning("Error", f"Error pada Start Loop: {str(e)}")
+            
+            elif func['type'] == "End Loop":
+                # End Loop is handled by Start Loop, so we skip it
+                continue
+            
             # Apply delay after function execution
             if func['delay'] > 0:
                 time.sleep(func['delay'])
@@ -279,3 +388,77 @@ def run_automation(self):
         self.is_running = False
         self.start_btn.config(state=tk.NORMAL)
         self.stop_btn.config(state=tk.DISABLED)
+
+
+def execute_single_function(self, func):
+    """Execute a single automation function"""
+    try:
+        if func['type'] == "Click":
+            if func.get('x') and func.get('y'):
+                pyautogui.click(func['x'], func['y'])
+        
+        elif func['type'] == "Double Click":
+            if func.get('x') and func.get('y'):
+                pyautogui.doubleClick(func['x'], func['y'])
+        
+        elif func['type'] == "Right Click":
+            if func.get('x') and func.get('y'):
+                pyautogui.rightClick(func['x'], func['y'])
+        
+        elif func['type'] == "Type Text":
+            if func['parameter']:
+                text = func['parameter']
+                processed_text = self.process_text_for_typing(text)
+                self.safe_typewrite(processed_text)
+        
+        elif func['type'] == "Type Text Popup":
+            # Show popup for text input during execution
+            popup_result = self.show_text_input_popup(func.get('name', 'Fungsi'))
+            if popup_result["confirmed"] and popup_result["text"]:
+                processed_text = self.process_text_for_typing(popup_result["text"])
+                self.safe_typewrite(processed_text)
+        
+        elif func['type'] == "Hotkey":
+            if func['parameter']:
+                keys = func['parameter'].split('+')
+                keys = [key.strip() for key in keys]
+                pyautogui.hotkey(*keys)
+        
+        elif func['type'] == "Delay":
+            delay_time = func.get('delay', 1.0)
+            if delay_time > 0:
+                time.sleep(delay_time)
+        
+        elif func['type'] == "Scroll":
+            if func['parameter']:
+                try:
+                    scroll_params = json.loads(func['parameter'])
+                    direction = scroll_params.get('direction', 'Down')
+                    amount = int(scroll_params.get('amount', 3))
+                    
+                    if direction == "Up":
+                        pyautogui.scroll(amount)
+                    else:
+                        pyautogui.scroll(-amount)
+                except (json.JSONDecodeError, ValueError):
+                    pass
+        
+        elif func['type'] == "Drag":
+            if func.get('x') and func.get('y') and func['parameter']:
+                try:
+                    x1, y1 = func['x'], func['y']
+                    drag_params = json.loads(func['parameter'])
+                    x2 = int(drag_params.get('drag_x', 0))
+                    y2 = int(drag_params.get('drag_y', 0))
+                    pyautogui.drag(x2 - x1, y2 - y1, duration=1)
+                except (json.JSONDecodeError, ValueError):
+                    pass
+        
+        # Apply delay after function execution
+        delay = func.get('delay', 1.0)
+        if delay > 0:
+            time.sleep(delay)
+            
+    except Exception as e:
+        print(f"Error executing function {func.get('name', 'Unknown')}: {str(e)}")
+        messagebox.showwarning("Error", f"Error pada fungsi {func.get('name', 'Unknown')}: {str(e)}")

@@ -177,6 +177,47 @@ def add_function(self):
             parameter = json.dumps({
                 "variable_name": variable_name
             })
+        elif func_type == "Start Loop":
+            loop_type = self.loop_type_combo.get()
+            loop_count = self.loop_count_entry.get().strip()
+            loop_delay = self.loop_delay_entry.get().strip()
+            
+            if not loop_type:
+                messagebox.showwarning("Warning", "Pilih jenis loop!")
+                return
+            
+            if not loop_count:
+                messagebox.showwarning("Warning", "Masukkan jumlah loop!")
+                return
+            
+            if not loop_delay:
+                messagebox.showwarning("Warning", "Masukkan delay loop!")
+                return
+            
+            try:
+                loop_count_int = int(loop_count)
+                loop_delay_float = float(loop_delay)
+                
+                if loop_count_int < 1:
+                    messagebox.showwarning("Warning", "Jumlah loop harus minimal 1!")
+                    return
+                
+                if loop_delay_float < 0:
+                    messagebox.showwarning("Warning", "Delay loop tidak boleh negatif!")
+                    return
+                
+            except ValueError:
+                messagebox.showwarning("Warning", "Jumlah loop harus berupa angka dan delay harus berupa angka!")
+                return
+            
+            parameter = json.dumps({
+                "loop_type": loop_type,
+                "loop_count": loop_count_int,
+                "loop_delay": loop_delay_float
+            })
+        elif func_type == "End Loop":
+            # End Loop doesn't need parameters
+            parameter = ""
         
         # Create function object
         function = {
