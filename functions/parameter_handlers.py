@@ -16,7 +16,9 @@ def hide_all_parameters(self):
         self.image_threshold_label, self.image_threshold_entry, self.image_timeout_label, self.image_timeout_entry,
         self.image_preview_label, self.image_preview,
         self.variable_name_label, self.variable_name_entry, self.variable_value_label, self.variable_value_entry,
-        self.variable_source_label, self.variable_source_combo
+        self.variable_source_label, self.variable_source_combo,
+        self.loop_type_label, self.loop_type_combo, self.loop_count_label, self.loop_count_entry,
+        self.loop_delay_label, self.loop_delay_entry
     ]
     for widget in widgets_to_hide:
         widget.grid_remove()
