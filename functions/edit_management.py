@@ -132,6 +132,60 @@ def edit_function(self):
     http_loop_delay_var = tk.StringVar()
     http_loop_delay_entry = ttk.Entry(param_frame, textvariable=http_loop_delay_var, width=10)
     
+    # Loop parameters (for Start Loop function)
+    loop_count_label = ttk.Label(param_frame, text="Loop Count:")
+    loop_count_var = tk.StringVar()
+    loop_count_entry = ttk.Entry(param_frame, textvariable=loop_count_var, width=10)
+    
+    loop_delay_label = ttk.Label(param_frame, text="Loop Delay (s):")
+    loop_delay_var = tk.StringVar()
+    loop_delay_entry = ttk.Entry(param_frame, textvariable=loop_delay_var, width=10)
+    
+    loop_type_label = ttk.Label(param_frame, text="Loop Type:")
+    loop_type_var = tk.StringVar()
+    loop_type_combo = ttk.Combobox(param_frame, textvariable=loop_type_var, values=[
+        "Fixed Count", "Infinite", "Until Condition"
+    ], state="readonly", width=15)
+    
+    # Variable parameters (for Set Variable and Get Variable functions)
+    variable_name_label = ttk.Label(param_frame, text="Variable Name:")
+    variable_name_var = tk.StringVar()
+    variable_name_entry = ttk.Entry(param_frame, textvariable=variable_name_var, width=20)
+    
+    variable_value_label = ttk.Label(param_frame, text="Variable Value:")
+    variable_value_var = tk.StringVar()
+    variable_value_entry = ttk.Entry(param_frame, textvariable=variable_value_var, width=30)
+    
+    variable_source_label = ttk.Label(param_frame, text="Value Source:")
+    variable_source_var = tk.StringVar()
+    variable_source_combo = ttk.Combobox(param_frame, textvariable=variable_source_var, values=[
+        "Manual Input", "Clipboard", "Current Time", "Random Number", "Screen Text (OCR)", "Last Click Position"
+    ], state="readonly", width=20)
+    
+    # Wait for Image parameters
+    image_label = ttk.Label(param_frame, text="Template Image:")
+    image_path_var = tk.StringVar()
+    image_path_entry = ttk.Entry(param_frame, textvariable=image_path_var, width=40)
+    image_browse_btn = ttk.Button(param_frame, text="Browse", command=lambda: browse_image_file_edit())
+    
+    image_threshold_label = ttk.Label(param_frame, text="Threshold:")
+    image_threshold_var = tk.StringVar()
+    image_threshold_entry = ttk.Entry(param_frame, textvariable=image_threshold_var, width=8)
+    
+    image_timeout_label = ttk.Label(param_frame, text="Timeout (s):")
+    image_timeout_var = tk.StringVar()
+    image_timeout_entry = ttk.Entry(param_frame, textvariable=image_timeout_var, width=8)
+    
+    def browse_image_file_edit():
+        """Browse for image file in edit dialog"""
+        from tkinter import filedialog
+        filename = filedialog.askopenfilename(
+            title="Pilih Template Image",
+            filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.gif"), ("All files", "*.*")]
+        )
+        if filename:
+            image_path_var.set(filename)
+    
     # Capture Mouse button for drag coordinates
     def capture_edit_drag_coordinates():
         """Capture mouse coordinates for drag destination in edit dialog"""
@@ -188,6 +242,45 @@ def edit_function(self):
             http_body_var.set("{}")
             http_loop_var.set("1")
             http_loop_delay_var.set("1.0")
+    elif func_data["type"] == "Start Loop":
+        # Parse Start Loop parameter (JSON format)
+        try:
+            loop_params = json.loads(current_param)
+            loop_count_var.set(str(loop_params.get("loop_count", 1)))
+            loop_delay_var.set(str(loop_params.get("loop_delay", 1.0)))
+            loop_type_var.set(loop_params.get("loop_type", "Fixed Count"))
+        except (json.JSONDecodeError, KeyError):
+            # Set default values if parsing fails
+            loop_count_var.set("1")
+            loop_delay_var.set("1.0")
+            loop_type_var.set("Fixed Count")
+    elif func_data["type"] == "Set Variable":
+        # Parse Set Variable parameter (JSON format)
+        try:
+            var_params = json.loads(current_param)
+            variable_name_var.set(var_params.get("name", ""))
+            variable_value_var.set(var_params.get("value", ""))
+            variable_source_var.set(var_params.get("source", "Manual Input"))
+        except (json.JSONDecodeError, KeyError):
+            # Set default values if parsing fails
+            variable_name_var.set("")
+            variable_value_var.set("")
+            variable_source_var.set("Manual Input")
+    elif func_data["type"] == "Get Variable":
+        # Parse Get Variable parameter (just variable name)
+        variable_name_var.set(current_param)
+    elif func_data["type"] == "Wait for Image":
+        # Parse Wait for Image parameter (JSON format)
+        try:
+            image_params = json.loads(current_param)
+            image_path_var.set(image_params.get("image_path", ""))
+            image_threshold_var.set(str(image_params.get("threshold", 0.8)))
+            image_timeout_var.set(str(image_params.get("timeout", 30)))
+        except (json.JSONDecodeError, KeyError):
+            # Set default values if parsing fails
+            image_path_var.set("")
+            image_threshold_var.set("0.8")
+            image_timeout_var.set("30")
     
     # Status label for capture feedback
     status_label = ttk.Label(edit_window, text="", foreground="blue")
@@ -208,7 +301,12 @@ def edit_function(self):
                       drag_label, drag_x_entry, drag_y_label, drag_y_entry, drag_capture_btn,
                       http_url_label, http_url_entry, http_method_label, http_method_combo,
                       http_headers_label, http_headers_entry, http_body_label, http_body_entry,
-                      http_loop_label, http_loop_entry, http_loop_delay_label, http_loop_delay_entry]:
+                      http_loop_label, http_loop_entry, http_loop_delay_label, http_loop_delay_entry,
+                      loop_count_label, loop_count_entry, loop_delay_label, loop_delay_entry,
+                      loop_type_label, loop_type_combo, variable_name_label, variable_name_entry,
+                      variable_value_label, variable_value_entry, variable_source_label, variable_source_combo,
+                      image_label, image_path_entry, image_browse_btn, image_threshold_label,
+                      image_threshold_entry, image_timeout_label, image_timeout_entry]:
             widget.grid_remove()
         
         # Show relevant parameter widgets based on function type
@@ -247,6 +345,31 @@ def edit_function(self):
             http_loop_entry.grid(row=4, column=1, padx=5, pady=5)
             http_loop_delay_label.grid(row=4, column=2, sticky=tk.W, padx=(10, 5), pady=5)
             http_loop_delay_entry.grid(row=4, column=3, padx=5, pady=5)
+        elif func_type == "Start Loop":
+            loop_count_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+            loop_count_entry.grid(row=0, column=1, padx=5, pady=5)
+            loop_delay_label.grid(row=0, column=2, sticky=tk.W, padx=(10, 5), pady=5)
+            loop_delay_entry.grid(row=0, column=3, padx=5, pady=5)
+            loop_type_label.grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+            loop_type_combo.grid(row=1, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=5, pady=5)
+        elif func_type == "Set Variable":
+            variable_name_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+            variable_name_entry.grid(row=0, column=1, padx=5, pady=5)
+            variable_value_label.grid(row=0, column=2, sticky=tk.W, padx=(10, 5), pady=5)
+            variable_value_entry.grid(row=0, column=3, sticky=(tk.W, tk.E), padx=5, pady=5)
+            variable_source_label.grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+            variable_source_combo.grid(row=1, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=5, pady=5)
+        elif func_type == "Get Variable":
+            variable_name_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+            variable_name_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+        elif func_type == "Wait for Image":
+            image_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+            image_path_entry.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=5, pady=5)
+            image_browse_btn.grid(row=0, column=3, padx=(10, 5), pady=5)
+            image_threshold_label.grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+            image_threshold_entry.grid(row=1, column=1, padx=5, pady=5)
+            image_timeout_label.grid(row=1, column=2, sticky=tk.W, padx=(10, 5), pady=5)
+            image_timeout_entry.grid(row=1, column=3, padx=5, pady=5)
     
     type_var.trace("w", update_coord_visibility)
     type_var.trace("w", update_param_visibility)
@@ -398,6 +521,102 @@ def edit_function(self):
                     "body": body,
                     "loop_count": loop_count_int,
                     "loop_delay": loop_delay_float
+                })
+            elif func_type == "Start Loop":
+                # Validate and construct Start Loop parameter
+                loop_count_str = loop_count_var.get().strip()
+                loop_delay_str = loop_delay_var.get().strip()
+                loop_type_str = loop_type_var.get()
+                
+                # Validate loop count
+                try:
+                    loop_count_int = int(loop_count_str) if loop_count_str else 1
+                    if loop_count_int <= 0:
+                        messagebox.showerror("Error", "Loop count harus berupa angka positif!")
+                        return
+                except ValueError:
+                    messagebox.showerror("Error", "Loop count harus berupa angka!")
+                    return
+                
+                # Validate loop delay
+                try:
+                    loop_delay_float = float(loop_delay_str) if loop_delay_str else 0.0
+                    if loop_delay_float < 0:
+                        messagebox.showerror("Error", "Loop delay harus berupa angka positif atau nol!")
+                        return
+                except ValueError:
+                    messagebox.showerror("Error", "Loop delay harus berupa angka!")
+                    return
+                
+                # Construct Start Loop parameter as JSON
+                parameter = json.dumps({
+                    "count": loop_count_int,
+                    "delay": loop_delay_float,
+                    "type": loop_type_str
+                })
+            elif func_type == "Set Variable":
+                # Validate and construct Set Variable parameter
+                var_name = variable_name_var.get().strip()
+                var_value = variable_value_var.get().strip()
+                var_source = variable_source_var.get()
+                
+                if not var_name:
+                    messagebox.showerror("Error", "Nama variabel tidak boleh kosong!")
+                    return
+                
+                # Construct Set Variable parameter as JSON
+                parameter = json.dumps({
+                    "name": var_name,
+                    "value": var_value,
+                    "source": var_source
+                })
+            elif func_type == "Get Variable":
+                # Validate and construct Get Variable parameter
+                var_name = variable_name_var.get().strip()
+                
+                if not var_name:
+                    messagebox.showerror("Error", "Nama variabel tidak boleh kosong!")
+                    return
+                
+                # Construct Get Variable parameter as JSON
+                parameter = json.dumps({
+                    "name": var_name
+                })
+            elif func_type == "Wait for Image":
+                # Validate and construct Wait for Image parameter
+                image_path = image_path_var.get().strip()
+                threshold_str = image_threshold_var.get().strip()
+                timeout_str = image_timeout_var.get().strip()
+                
+                if not image_path:
+                    messagebox.showerror("Error", "Path gambar tidak boleh kosong!")
+                    return
+                
+                # Validate threshold
+                try:
+                    threshold_float = float(threshold_str) if threshold_str else 0.8
+                    if threshold_float < 0 or threshold_float > 1:
+                        messagebox.showerror("Error", "Threshold harus antara 0 dan 1!")
+                        return
+                except ValueError:
+                    messagebox.showerror("Error", "Threshold harus berupa angka!")
+                    return
+                
+                # Validate timeout
+                try:
+                    timeout_int = int(timeout_str) if timeout_str else 10
+                    if timeout_int <= 0:
+                        messagebox.showerror("Error", "Timeout harus berupa angka positif!")
+                        return
+                except ValueError:
+                    messagebox.showerror("Error", "Timeout harus berupa angka!")
+                    return
+                
+                # Construct Wait for Image parameter as JSON
+                parameter = json.dumps({
+                    "image_path": image_path,
+                    "threshold": threshold_float,
+                    "timeout": timeout_int
                 })
             
             # Update the function data
