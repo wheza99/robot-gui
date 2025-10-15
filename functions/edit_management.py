@@ -94,7 +94,7 @@ def edit_function(self):
     capture_coord_btn.grid(row=0, column=4, padx=(10, 5), pady=5)
     
     # Parameter frame
-    param_frame = ttk.LabelFrame(edit_window, text="Parameter")
+    param_frame = ttk.LabelFrame(scrollable_frame, text="Parameter")
     param_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=10, pady=5)
     
     # Create specific parameter fields for each function type
@@ -299,9 +299,8 @@ def edit_function(self):
             image_threshold_var.set("0.8")
             image_timeout_var.set("30")
     
-    # Status label for capture feedback
-    status_label = ttk.Label(edit_window, text="", foreground="blue")
-    status_label.grid(row=5, column=0, columnspan=2, pady=5)
+    # Status label for capture feedback (moved to end of function)
+    # Will be created after scrollable_frame is set up
     
     # Function to update coordinate visibility
     def update_coord_visibility(*args):
@@ -388,13 +387,13 @@ def edit_function(self):
             image_timeout_label.grid(row=1, column=2, sticky=tk.W, padx=(10, 5), pady=5)
             image_timeout_entry.grid(row=1, column=3, padx=5, pady=5)
     
-    type_var.trace("w", update_coord_visibility)
-    type_var.trace("w", update_param_visibility)
+    type_var.trace_add("write", update_coord_visibility)
+    type_var.trace_add("write", update_param_visibility)
     update_coord_visibility()  # Initial call
     update_param_visibility()  # Initial call
     
     # Delay frame
-    delay_frame = ttk.LabelFrame(edit_window, text="Delay")
+    delay_frame = ttk.LabelFrame(scrollable_frame, text="Delay")
     delay_frame.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=10, pady=5)
     
     ttk.Label(delay_frame, text="Delay setelah (detik):").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
@@ -403,7 +402,7 @@ def edit_function(self):
     delay_entry.grid(row=0, column=1, padx=5, pady=5)
     
     # Enabled checkbox frame
-    enabled_frame = ttk.LabelFrame(edit_window, text="Status")
+    enabled_frame = ttk.LabelFrame(scrollable_frame, text="Status")
     enabled_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=10, pady=5)
     
     enabled_var = tk.BooleanVar(value=func_data.get('enabled', True))
@@ -411,7 +410,7 @@ def edit_function(self):
     enabled_checkbox.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
     
     # Buttons frame
-    btn_frame = ttk.Frame(edit_window)
+    btn_frame = ttk.Frame(scrollable_frame)
     btn_frame.grid(row=6, column=0, columnspan=2, pady=20)
     
     def save_changes():
@@ -670,5 +669,9 @@ def edit_function(self):
     cancel_btn.pack(side=tk.LEFT)
     
     # Configure column weights for proper resizing
-    edit_window.columnconfigure(1, weight=1)
+    scrollable_frame.columnconfigure(1, weight=1)
     param_frame.columnconfigure(1, weight=1)
+    
+    # Add status label for feedback
+    status_label = ttk.Label(scrollable_frame, text="")
+    status_label.grid(row=7, column=0, columnspan=2, pady=5)
