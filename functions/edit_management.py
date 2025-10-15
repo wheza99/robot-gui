@@ -22,29 +22,46 @@ def edit_function(self):
     # Create edit dialog
     edit_window = tk.Toplevel(self.root)
     edit_window.title("Edit Fungsi")
-    edit_window.geometry("500x400")
-    edit_window.resizable(False, False)
+    edit_window.geometry("600x700")
+    edit_window.resizable(True, True)
     edit_window.grab_set()  # Make dialog modal
     
     # Center the window
     edit_window.transient(self.root)
     
+    # Create main frame with scrollbar
+    main_canvas = tk.Canvas(edit_window)
+    scrollbar = ttk.Scrollbar(edit_window, orient="vertical", command=main_canvas.yview)
+    scrollable_frame = ttk.Frame(main_canvas)
+    
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+    )
+    
+    main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    main_canvas.configure(yscrollcommand=scrollbar.set)
+    
+    # Pack canvas and scrollbar
+    main_canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+    
     # Function name
-    ttk.Label(edit_window, text="Nama Fungsi:").grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
+    ttk.Label(scrollable_frame, text="Nama Fungsi:").grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
     name_var = tk.StringVar(value=func_data.get("name", ""))
-    name_entry = ttk.Entry(edit_window, textvariable=name_var, width=30)
+    name_entry = ttk.Entry(scrollable_frame, textvariable=name_var, width=30)
     name_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=10, pady=5)
     
     # Function type
-    ttk.Label(edit_window, text="Jenis Fungsi:").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
+    ttk.Label(scrollable_frame, text="Jenis Fungsi:").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
     type_var = tk.StringVar(value=func_data["type"])
-    type_combo = ttk.Combobox(edit_window, textvariable=type_var, values=[
-        "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click", "HTTP Request", "Wait for Image", "Set Variable", "Get Variable"
+    type_combo = ttk.Combobox(scrollable_frame, textvariable=type_var, values=[
+        "Click", "Type Text", "Type Text Popup", "Delay", "Hotkey", "Scroll", "Drag", "Double Click", "Right Click", "HTTP Request", "Wait for Image", "Set Variable", "Get Variable", "Start Loop"
     ], state="readonly", width=27)
     type_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=10, pady=5)
     
     # Coordinates frame
-    coord_frame = ttk.LabelFrame(edit_window, text="Koordinat")
+    coord_frame = ttk.LabelFrame(scrollable_frame, text="Koordinat")
     coord_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=10, pady=5)
     
     ttk.Label(coord_frame, text="X:").grid(row=0, column=0, padx=5, pady=5)
